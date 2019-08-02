@@ -672,15 +672,6 @@ public:
     return Nested;
   }
 
-  unsigned countFavoredNestedConstraints() const {
-    unsigned count = 0;
-    for (auto *constraint : Nested)
-      if (constraint->isFavored() && !constraint->isDisabled())
-        count++;
-
-    return count;
-  }
-
   unsigned countActiveNestedConstraints() const {
     unsigned count = 0;
     for (auto *constraint : Nested)
