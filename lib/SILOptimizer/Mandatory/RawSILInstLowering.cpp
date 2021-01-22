@@ -178,6 +178,24 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
   SILLocation loc = inst->getLoc();
   SILBuilderWithScope forCleanup(std::next(inst->getIterator()));
 
+  SmallVector<SILInstruction *, 4> unused;
+  unused.push_back(inst);
+
+  auto removeUnusedPAI = [&](PartialApplyInst *PAI) {
+    if (auto *consumingUse = PAI->getSingleConsumingUse()) {
+      unused.push_back(consumingUse->getUser());
+    }
+
+    unused.push_back(PAI);
+    unused.push_back(PAI->getCallee().getDefiningInstruction());
+
+    for (auto arg : PAI->getArguments()) {
+      // Erase arguments that are only used by this partial apply.
+      if (arg->getSingleUse())
+        unused.push_back(arg.getDefiningInstruction());
+    }
+  };
+
   switch (inst->getAssignDestination()) {
     case AssignByWrapperInst::Destination::BackingWrapper: {
       SILValue initFn = inst->getInitializer();
@@ -199,8 +217,8 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
           b.createStore(loc, wrappedSrc, dest, StoreOwnershipQualifier::Assign);
         }
       }
-      // TODO: remove the unused setter function, which usually is a dead
-      // partial_apply.
+
+      removeUnusedPAI(dyn_cast<PartialApplyInst>(inst->getSetter()));
       break;
     }
     case AssignByWrapperInst::Destination::WrappedValue: {
@@ -218,12 +236,16 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
       // nested access violation.
       if (auto *BA = dyn_cast<BeginAccessInst>(dest))
         accessMarkers.push_back(BA);
-      // TODO: remove the unused init function, which usually is a dead
-      // partial_apply.
+
+      removeUnusedPAI(dyn_cast<PartialApplyInst>(inst->getInitializer()));
       break;
     }
   }
-  inst->eraseFromParent();
+
+  // Remove the unused instructions.
+  for (auto *inst : unused) {
+    inst->eraseFromParent();
+  }
 }
 
 static void deleteDeadAccessMarker(BeginAccessInst *BA) {

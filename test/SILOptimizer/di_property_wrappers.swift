@@ -599,6 +599,21 @@ func testStructWithClassWrapper() {
   // CHECK-NEXT:  .. set Optional(10)
 }
 
+struct IntStructWithClassWrapper {
+  @ClassWrapper var wrapped: Int
+
+  init() {
+    wrapped = 42
+  }
+}
+
+func testIntStructWithClassWrapper() {
+  // CHECK: ## IntStructWithClassWrapper
+  print("\n## IntStructWithClassWrapper")
+  let _ = IntStructWithClassWrapper()
+  // CHECK-NEXT:  .. init 42
+}
+
 testIntStruct()
 testIntClass()
 testRefStruct()
@@ -611,3 +626,4 @@ testWrapperInitWithDefaultArg()
 testSR_12341()
 testNonMutatingSetterStruct()
 testStructWithClassWrapper()
+testIntStructWithClassWrapper()
