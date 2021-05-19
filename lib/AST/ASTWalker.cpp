@@ -184,19 +184,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    bool isPropertyWrapperBackingProperty = false;
-    if (auto singleVar = PBD->getSingleVar()) {
-      isPropertyWrapperBackingProperty =
-        singleVar->getOriginalWrappedProperty() != nullptr;
-    }
-
     for (auto idx : range(PBD->getNumPatternEntries())) {
       if (Pattern *Pat = doIt(PBD->getPattern(idx)))
         PBD->setPattern(idx, Pat, PBD->getInitContext(idx));
       else
         return true;
       if (PBD->getInit(idx) &&
-          !isPropertyWrapperBackingProperty &&
           (!PBD->isInitializerSubsumed(idx) ||
            Walker.shouldWalkIntoLazyInitializers())) {
 #ifndef NDEBUG

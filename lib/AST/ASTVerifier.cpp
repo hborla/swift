@@ -875,6 +875,16 @@ public:
       OptionalEvaluations.pop_back();
     }
 
+    bool shouldVerify(PropertyWrapperValuePlaceholderExpr *expr) {
+      assert(!OpaqueValues.count(expr->getOpaqueValuePlaceholder()));
+      OpaqueValues[expr->getOpaqueValuePlaceholder()] = 0;
+      return true;
+    }
+    void cleanup(PropertyWrapperValuePlaceholderExpr *expr) {
+      assert(OpaqueValues.count(expr->getOpaqueValuePlaceholder()));
+      OpaqueValues.erase(expr->getOpaqueValuePlaceholder());
+    }
+
     // Register the OVEs in a collection upcast.
     bool shouldVerify(CollectionUpcastConversionExpr *expr) {
       if (!shouldVerify(cast<Expr>(expr)))
