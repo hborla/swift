@@ -292,6 +292,7 @@ public:
   void visitCustomAttr(CustomAttr *attr);
   void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
   void visitResultBuilderAttr(ResultBuilderAttr *attr);
+  void visitRegistryAttr(RegistryAttr *attr);
 
   void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
   void visitNonEphemeralAttr(NonEphemeralAttr *attr);
@@ -3585,6 +3586,17 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
                  diag::result_builder_buildblock_not_static_method);
     }
   }
+}
+
+void AttributeChecker::visitRegistryAttr(RegistryAttr *attr) {
+  auto &ctx = D->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::RegistryTypes)) {
+    diagnose(attr->getLocation(),
+             diag::experimental_registry_attr);
+    return;
+  }
+
+  return;
 }
 
 void

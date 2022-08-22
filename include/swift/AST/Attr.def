@@ -582,7 +582,11 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   100)
 
-// 101 was @asyncHandler and is now unused
+SIMPLE_DECL_ATTR(registry, Registry,
+  OnStruct | OnClass |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  101) // Previously @asyncHandler
 
 // TODO: Remove this once we don't need to support 'actor' as a modifier
 CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,

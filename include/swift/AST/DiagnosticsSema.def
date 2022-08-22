@@ -6259,6 +6259,13 @@ ERROR(cannot_convert_result_builder_result_to_return_type,none,
       "cannot convert result builder result type %0 to return type %1",
       (Type,Type))
 
+//------------------------------------------------------------------------------
+// MARK: Registry type diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(experimental_registry_attr,none,
+      "unknown attribute 'registry'", ())
+
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics
