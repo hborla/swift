@@ -3057,6 +3057,10 @@ static bool usesFeatureOpaqueTypeErasure(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureRegistryTypes(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureDifferentiableProgramming(Decl *decl) {
   return false;
 }

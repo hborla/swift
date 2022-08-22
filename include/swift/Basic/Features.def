@@ -122,6 +122,9 @@ EXPERIMENTAL_FEATURE(SendableCompletionHandlers)
 /// Enables opaque type erasure without also enabling implict dynamic
 EXPERIMENTAL_FEATURE(OpaqueTypeErasure)
 
+/// Enables the experimental `@registry` attribute
+EXPERIMENTAL_FEATURE(RegistryTypes)
+
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef SUPPRESSIBLE_LANGUAGE_FEATURE
