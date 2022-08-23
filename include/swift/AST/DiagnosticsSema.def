@@ -6265,7 +6265,14 @@ ERROR(cannot_convert_result_builder_result_to_return_type,none,
 
 ERROR(experimental_registry_attr,none,
       "unknown attribute 'registry'", ())
-
+ERROR(invalid_registered_value_decl,none,
+      "Cannot register %0 %1 "
+      "with registry %2",
+      (DescriptiveDeclKind, Identifier, Identifier))
+ERROR(invalid_registered_decl,none,
+      "Registry type %0 can only be applied to "
+      "non-generic types and top-level functions",
+      (Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics
