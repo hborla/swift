@@ -3491,43 +3491,15 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
-  // If the nominal type is a registry type, verify that D is:
-  //   - A protocol,
-  //   - A non-generic nominal type, or
-  //   - A non-generic top-level function
   if (nominal->getAttrs().hasAttribute<RegistryAttr>()) {
-    if (auto *registered = dyn_cast<NominalTypeDecl>(D)) {
-      if (!isa<ProtocolDecl>(registered) &&
-          registered->isGeneric()) {
-        registered->diagnose(diag::invalid_registered_value_decl,
-                             registered->getDescriptiveKind(),
-                             registered->getName(),
-                             nominal->getName());
-        return;
-      }
-    } else if (auto *registered = dyn_cast<FuncDecl>(D)) {
-      if (registered->isGeneric() ||
-          !(registered->getDeclContext()->isModuleScopeContext() ||
-            registered->isStatic())) {
-        registered->diagnose(diag::invalid_registered_value_decl,
-                       registered->getDescriptiveKind(),
-                       registered->getName().getBaseIdentifier(),
-                       nominal->getName());
-        return;
-      }
-    } else if (auto *registered = dyn_cast<ValueDecl>(D)) {
-      registered->diagnose(diag::invalid_registered_value_decl,
-                      registered->getDescriptiveKind(),
-                      registered->getName().getBaseIdentifier(),
-                      nominal->getName());
-    } else {
-      D->diagnose(diag::invalid_registered_decl,
-                  nominal->getName());
+    auto *value = dyn_cast<ValueDecl>(D);
+    if (!value) {
+      diagnoseAndRemoveAttr(attr, diag::invalid_registered_decl,
+                            nominal->getName());
       return;
     }
 
     // Force diagnostics from computing the registry type.
-    auto *value = dyn_cast<ValueDecl>(D);
     (void)value->getAttachedRegistryType();
     return;
   }

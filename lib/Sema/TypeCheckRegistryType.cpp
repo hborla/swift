@@ -36,6 +36,37 @@ AttachedRegistryAttr::evaluate(Evaluator &evaluator,
     if (!nominal || !nominal->getAttrs().hasAttribute<RegistryAttr>())
       continue;
 
+    // If the nominal type is a registry type, verify that 'value' is:
+    //   - A protocol,
+    //   - A non-generic nominal type, or
+    //   - A non-generic top-level function
+
+    auto diagnoseInvalidAttr = [&]() {
+      diagnoseAndRemoveAttr(value, mutableAttr,
+                            diag::invalid_registered_value_decl,
+                            value->getDescriptiveKind(),
+                            value->getName().getBaseIdentifier(),
+                            nominal->getName());
+    };
+
+    if (!dyn_cast<NominalTypeDecl>(value) && !dyn_cast<FuncDecl>(value)) {
+      diagnoseInvalidAttr();
+      continue;
+    }
+
+    if (!isa<ProtocolDecl>(value) &&
+        value->getInnermostDeclContext()->isGenericContext()) {
+      diagnoseInvalidAttr();
+      continue;
+    }
+
+    if (isa<FuncDecl>(value) &&
+        !value->getDeclContext()->isModuleScopeContext() &&
+        !value->isStatic()) {
+      diagnoseInvalidAttr();
+      continue;
+    }
+
     result.push_back(mutableAttr);
   }
 

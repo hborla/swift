@@ -32,11 +32,11 @@ struct ConformingStruct: P {}
 
 @ConformanceCollector
 struct GenericStruct<T>: P {}
-  // expected-error@-1 {{Cannot register generic struct 'GenericStruct' with registry 'ConformanceCollector'}}
+  // expected-error@-2 {{Cannot register generic struct 'GenericStruct' with registry 'ConformanceCollector'}}
 
 @ConformanceCollector
 extension Int: P {}
-// expected-error@-1 {{Registry type 'ConformanceCollector' can only be applied to non-generic types and top-level functions}}
+// expected-error@-2 {{Registry type 'ConformanceCollector' can only be applied to non-generic types and top-level functions}}
 
 @registry
 struct FunctionCollector {}
@@ -46,19 +46,19 @@ func global() {}
 
 @FunctionCollector
 func globalGeneric<T>(value: T) {}
-// expected-error@-1 {{Cannot register global function 'globalGeneric' with registry 'FunctionCollector'}}
+// expected-error@-2 {{Cannot register global function 'globalGeneric' with registry 'FunctionCollector'}}
 
 struct TypeContext {
   @FunctionCollector
   func instanceMethod() {}
-  // expected-error@-1 {{Cannot register instance method 'instanceMethod' with registry 'FunctionCollector'}}
+  // expected-error@-2 {{Cannot register instance method 'instanceMethod' with registry 'FunctionCollector'}}
 
   @FunctionCollector
   static func staticMethod() {}
 
   @FunctionCollector
   let property: Int
-  // expected-error@-1 {{Cannot register property 'property' with registry 'FunctionCollector'}}
+  // expected-error@-2 {{Cannot register property 'property' with registry 'FunctionCollector'}}
 }
 
 @ConformanceCollector
