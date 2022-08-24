@@ -2698,6 +2698,14 @@ public:
   /// if there is one.
   Type getResultBuilderType() const;
 
+  /// Retrieve the registry custom attribute attached
+  /// to this declaration if there is one.
+  CustomAttr *getAttachedRegistryAttr() const;
+
+  /// Retrieve the registry type attached to this declaration
+  /// if there is one.
+  Type getAttachedRegistryType() const;
+
   /// If this value or its backing storage is annotated
   /// @_dynamicReplacement(for: ...), compute the original declaration
   /// that this declaration dynamically replaces.

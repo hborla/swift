@@ -982,6 +982,48 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Request the registry custom attribute attached to the given
+/// declaration, if there is one.
+class AttachedRegistryAttr :
+    public SimpleRequest<AttachedRegistryAttr,
+                         CustomAttr *(ValueDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  CustomAttr *
+  evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Request the registry type attached to the given declaration,
+/// if there is one.
+class AttachedRegistryType :
+    public SimpleRequest<AttachedRegistryType,
+                         Type(ValueDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type
+  evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Request a function's self access kind.
 class SelfAccessKindRequest :
     public SimpleRequest<SelfAccessKindRequest,

@@ -6273,6 +6273,9 @@ ERROR(invalid_registered_decl,none,
       "Registry type %0 can only be applied to "
       "non-generic types and top-level functions",
       (Identifier))
+ERROR(multiple_registry_types,none,
+      "%0 %1 cannot have multiple registry attributes",
+      (DescriptiveDeclKind, Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: Tuple Shuffle Diagnostics

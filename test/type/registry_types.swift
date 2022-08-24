@@ -60,3 +60,9 @@ struct TypeContext {
   let property: Int
   // expected-error@-1 {{Cannot register property 'property' with registry 'FunctionCollector'}}
 }
+
+@ConformanceCollector
+@FunctionCollector
+struct MultipleRegistrations {}
+// expected-error@-1 {{struct 'MultipleRegistrations' cannot have multiple registry attributes}}
+

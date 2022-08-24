@@ -3526,6 +3526,9 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       return;
     }
 
+    // Force diagnostics from computing the registry type.
+    auto *value = dyn_cast<ValueDecl>(D);
+    (void)value->getAttachedRegistryType();
     return;
   }
 

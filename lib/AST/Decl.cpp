@@ -7236,6 +7236,22 @@ CustomAttr *ValueDecl::getAttachedResultBuilder() const {
                            nullptr);
 }
 
+CustomAttr *ValueDecl::getAttachedRegistryAttr() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<ValueDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           AttachedRegistryAttr{mutableThis},
+                           nullptr);
+}
+
+Type ValueDecl::getAttachedRegistryType() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<ValueDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           AttachedRegistryType{mutableThis},
+                           Type());
+}
+
 void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   auto oldContext = getCachedDefaultArgumentInitContext();
   assert((!oldContext || oldContext == initContext) &&
