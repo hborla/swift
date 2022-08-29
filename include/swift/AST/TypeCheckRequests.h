@@ -1024,6 +1024,26 @@ public:
   bool isCached() const { return true; }
 };
 
+/// TODO: document me!
+class RegistryTypeRecord :
+    public SimpleRequest<RegistryTypeRecord,
+                         Expr *(ValueDecl *),
+                         RequestFlags::Cached> {
+public:
+using SimpleRequest::SimpleRequest;
+
+private:
+friend SimpleRequest;
+
+// Evaluation.
+Expr *
+evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+// Caching
+bool isCached() const { return true; }
+};
+
 /// Request a function's self access kind.
 class SelfAccessKindRequest :
     public SimpleRequest<SelfAccessKindRequest,

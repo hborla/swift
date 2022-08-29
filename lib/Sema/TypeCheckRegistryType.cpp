@@ -103,3 +103,64 @@ AttachedRegistryType::evaluate(Evaluator &evaluator,
 
   return registryType;
 }
+
+Expr *
+RegistryTypeRecord::evaluate(Evaluator &evaluator,
+                             ValueDecl *value) const {
+  ASTContext &ctx = value->getASTContext();
+  DeclContext *dc = value->getDeclContext();
+
+  auto *registryAttr = value->getAttachedRegistryAttr();
+  auto registryType = value->getAttachedRegistryType();
+  if (!registryAttr || !registryType)
+    return nullptr;
+
+  Expr *initArgument = nullptr;
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(value)) {
+    // Registry attributes on protocols are only used for
+    // inference on conforming types.
+    if (isa<ProtocolDecl>(nominal))
+      return nullptr;
+
+    // Form an initializer call passing in the metatype
+    auto *metatype =
+        TypeExpr::createImplicit(nominal->getDeclaredType(), ctx);
+    initArgument = new (ctx) DotSelfExpr(metatype, SourceLoc(), SourceLoc());
+  } else if (auto *func = dyn_cast<FuncDecl>(value)) {
+    // Form an initializer call passing in the function reference
+    if (func->isStatic()) {
+      auto *decl = func->getDeclContext()->getAsDecl();
+      auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+      auto *metatype =
+          TypeExpr::createImplicit(nominal->getDeclaredType(), ctx);
+      initArgument =
+          UnresolvedDotExpr::createImplicit(ctx, metatype, func->getName());
+    } else {
+      initArgument = new (ctx) DeclRefExpr(
+          ConcreteDeclRef(func), DeclNameLoc(), /*implicit=*/true);
+    }
+  }
+
+  auto reprRange = SourceRange();
+  if (auto *repr = registryAttr->getTypeRepr()) {
+    reprRange = repr->getSourceRange();
+  }
+
+  auto typeExpr = TypeExpr::createImplicitHack(reprRange.Start,
+                                               registryType,
+                                               ctx);
+
+  // Add the initializer argument at the front of the argument list
+  SmallVector<Argument, 4> newArgs;
+  newArgs.push_back(Argument::unlabeled(initArgument));
+  if (auto *attrArgs = registryAttr->getArgs())
+    newArgs.append(attrArgs->begin(), attrArgs->end());
+
+  ArgumentList *argList = ArgumentList::createImplicit(
+      ctx, reprRange.Start, newArgs, reprRange.End);
+  Expr *init = CallExpr::createImplicit(ctx, typeExpr, argList);
+
+  TypeChecker::typeCheckExpression(init, dc);
+
+  return init;
+}

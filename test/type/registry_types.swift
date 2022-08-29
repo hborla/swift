@@ -22,7 +22,9 @@ extension Int {}
 var registryVar: Int = 10
 
 @registry
-struct ConformanceCollector {}
+struct ConformanceCollector {
+  init(_ metatype: any P.Type) {}
+}
 
 @ConformanceCollector
 protocol P {}
@@ -39,7 +41,9 @@ extension Int: P {}
 // expected-error@-2 {{Registry type 'ConformanceCollector' can only be applied to non-generic types and top-level functions}}
 
 @registry
-struct FunctionCollector {}
+struct FunctionCollector {
+  init(_ function: () -> Void) {}
+}
 
 @FunctionCollector
 func global() {}

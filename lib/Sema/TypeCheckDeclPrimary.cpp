@@ -1806,6 +1806,10 @@ public:
       if (!VD->getDeclContext()->isTypeContext())
         (void) getActorIsolation(VD);
 
+
+      // Force computation of registry type initializer 
+      (void)VD->getRegistryTypeRecord();
+
       // If this is a member of a nominal type, don't allow it to have a name of
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
       // expressions to mean something builtin to the language.  We *do* allow

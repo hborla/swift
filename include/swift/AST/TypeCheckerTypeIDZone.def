@@ -101,6 +101,8 @@ SWIFT_REQUEST(TypeChecker, AttachedRegistryAttr, CustomAttr *(ValueDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AttachedRegistryType, Type(ValueDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, RegistryTypeRecord, Expr *(ValueDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsActorRequest, bool(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDefaultActorRequest,

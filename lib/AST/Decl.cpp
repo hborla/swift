@@ -7252,6 +7252,14 @@ Type ValueDecl::getAttachedRegistryType() const {
                            Type());
 }
 
+Expr *ValueDecl::getRegistryTypeRecord() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<ValueDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           RegistryTypeRecord{mutableThis},
+                           nullptr);
+}
+
 void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   auto oldContext = getCachedDefaultArgumentInitContext();
   assert((!oldContext || oldContext == initContext) &&

@@ -2706,6 +2706,9 @@ public:
   /// if there is one.
   Type getAttachedRegistryType() const;
 
+  /// TODO: document me!
+  Expr *getRegistryTypeRecord() const;
+
   /// If this value or its backing storage is annotated
   /// @_dynamicReplacement(for: ...), compute the original declaration
   /// that this declaration dynamically replaces.
