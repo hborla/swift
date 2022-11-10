@@ -4785,6 +4785,10 @@ void PrintAST::visitVarargExpansionExpr(VarargExpansionExpr *expr) {
   visit(expr->getSubExpr());
 }
 
+void PrintAST::visitUnresolvedEllipsisExpr(UnresolvedEllipsisExpr *expr) {
+  visit(expr->getSubExpr());
+}
+
 void PrintAST::visitPackExpansionExpr(PackExpansionExpr *expr) {
   visit(expr->getPatternExpr());
 }

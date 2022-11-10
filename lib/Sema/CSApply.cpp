@@ -3818,6 +3818,10 @@ namespace {
       return expr;
     }
 
+    Expr *visitUnresolvedEllipsisExpr(UnresolvedEllipsisExpr *expr) {
+      llvm_unreachable("not implemented for UnresolvedEllipsisExpr");
+    }
+
     Expr *visitPackExpansionExpr(PackExpansionExpr *expr) {
       for (unsigned i = 0; i < expr->getNumBindings(); ++i) {
         auto *binding = expr->getBindings()[i];

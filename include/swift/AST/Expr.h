@@ -3515,6 +3515,46 @@ public:
   }
 };
 
+/// An unresolved postfix '...' expression.
+///
+/// The constraint system will resolve these expressions
+/// to either a postfix operator expression or a pack
+/// expansion expression.
+class UnresolvedEllipsisExpr final : public Expr {
+  Expr *SubExpr;
+  SourceLoc DotsLoc;
+
+  UnresolvedEllipsisExpr(Expr *subExpr,
+                         SourceLoc dotsLoc,
+                         bool implicit)
+    : Expr(ExprKind::UnresolvedEllipsis, implicit, Type()),
+      SubExpr(subExpr), DotsLoc(dotsLoc) {}
+
+public:
+  static UnresolvedEllipsisExpr *create(ASTContext &ctx,
+                                        Expr *subExpr,
+                                        SourceLoc dotsLoc,
+                                        bool implicit = false);
+
+  Expr *getSubExpr() const { return SubExpr; }
+
+  void setSubExpr(Expr *subExpr) {
+    SubExpr = subExpr;
+  }
+
+  SourceLoc getStartLoc() const {
+    return SubExpr->getStartLoc();
+  }
+
+  SourceLoc getEndLoc() const {
+    return DotsLoc;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnresolvedEllipsis;
+  }
+};
+
 /// A pack expansion expression is a pattern expression followed by
 /// the expansion operator '...'. The pattern expression contains
 /// references to parameter packs of length N, and the expansion

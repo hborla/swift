@@ -2912,6 +2912,10 @@ namespace {
       return variadicSeq;
     }
 
+    Type visitUnresolvedEllipsisExpr(UnresolvedEllipsisExpr *expr) {
+      llvm_unreachable("not implemented for UnresolvedEllipsisExpr");
+    }
+
     Type visitPackExpansionExpr(PackExpansionExpr *expr) {
       for (auto *binding : expr->getBindings()) {
         auto type = visit(binding);

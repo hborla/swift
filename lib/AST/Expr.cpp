@@ -393,6 +393,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(InOut, getSubExpr);
 
   NO_REFERENCE(VarargExpansion);
+  NO_REFERENCE(UnresolvedEllipsis);
   NO_REFERENCE(PackExpansion);
   NO_REFERENCE(DynamicType);
 
@@ -749,6 +750,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::OpenExistential:
   case ExprKind::MakeTemporarilyEscapable:
   case ExprKind::VarargExpansion:
+  case ExprKind::UnresolvedEllipsis:
   case ExprKind::PackExpansion:
     return false;
 
@@ -926,6 +928,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::AutoClosure:
   case ExprKind::InOut:
   case ExprKind::VarargExpansion:
+  case ExprKind::UnresolvedEllipsis:
   case ExprKind::PackExpansion:
   case ExprKind::DynamicType:
   case ExprKind::RebindSelfInConstructor:
@@ -1241,6 +1244,12 @@ VarargExpansionExpr *VarargExpansionExpr::createParamExpansion(ASTContext &ctx, 
 VarargExpansionExpr *VarargExpansionExpr::createArrayExpansion(ASTContext &ctx, ArrayExpr *AE) {
   assert(AE->getType() && "Expansion must have fully-resolved type!");
   return new (ctx) VarargExpansionExpr(AE, /*implicit*/ true, AE->getType());
+}
+
+UnresolvedEllipsisExpr *
+UnresolvedEllipsisExpr::create(ASTContext &ctx, Expr *subExpr,
+                               SourceLoc dotsLoc, bool implicit) {
+  return new (ctx) UnresolvedEllipsisExpr(subExpr, dotsLoc, implicit);
 }
 
 PackExpansionExpr *

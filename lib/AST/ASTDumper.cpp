@@ -2500,6 +2500,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitUnresolvedEllipsisExpr(UnresolvedEllipsisExpr *E) {
+    printCommon(E, "unresolved_ellipsis_expr") << "\n";
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitPackExpansionExpr(PackExpansionExpr *E) {
     printCommon(E, "pack_expansion_expr") << "\n";
     printRec(E->getPatternExpr());

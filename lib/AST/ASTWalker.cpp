@@ -838,6 +838,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
 
+  Expr *visitUnresolvedEllipsisExpr(UnresolvedEllipsisExpr *E) {
+    if (Expr *subExpr = doIt(E->getSubExpr())) {
+      E->setSubExpr(subExpr);
+      return E;
+    }
+    return nullptr;
+  }
+
   Expr *visitPackExpansionExpr(PackExpansionExpr *E) {
     if (Expr *pattern = doIt(E->getPatternExpr())) {
       E->setPatternExpr(pattern);

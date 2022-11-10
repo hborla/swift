@@ -447,6 +447,7 @@ namespace {
              CollectionUpcastConversionExpr *E,
              SGFContext C);
     RValue visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C);
+    RValue visitUnresolvedEllipsisExpr(UnresolvedEllipsisExpr *E, SGFContext C);
     RValue visitPackExpansionExpr(PackExpansionExpr *E, SGFContext C);
     RValue visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, SGFContext C);
     RValue visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
@@ -1511,6 +1512,12 @@ RValueEmitter::visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C) {
   auto result = SGF.emitNativeToBridgedValue(E, mv, origType, resultType,
                                              loweredResultTy, C);
   return RValue(SGF, E, result);
+}
+
+RValue
+RValueEmitter::visitUnresolvedEllipsisExpr(UnresolvedEllipsisExpr *E,
+                                           SGFContext C) {
+  llvm_unreachable("not implemented for UnresolvedEllipsisExpr");
 }
 
 RValue
