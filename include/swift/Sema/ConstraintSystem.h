@@ -5619,6 +5619,13 @@ private:
       Type type1, Type type2, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
 
+  /// Simplify a parenthesize constraint. If the second type is a pack expansion,
+  /// the first type will be bound to a tuple type. Otherwise, the first type will
+  /// be bound to the second type.
+  SolutionKind simplifyParenthesizeConstraint(
+      Type type1, Type type2, TypeMatchOptions flags,
+      ConstraintLocatorBuilder locator);
+
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(ConstraintFix *fix, Type type1, Type type2,

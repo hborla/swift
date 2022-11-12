@@ -1802,11 +1802,22 @@ namespace {
     }
 
     virtual Type visitParenExpr(ParenExpr *expr) {
-      // If the ParenExpr contains a pack expansion, generate a tuple
-      // type containing the pack expansion type.
-      if (CS.getType(expr->getSubExpr())->getAs<PackExpansionType>()) {
-        return TupleType::get({CS.getType(expr->getSubExpr())},
-                              CS.getASTContext());
+      auto elementType = CS.getType(expr->getSubExpr());
+
+      // If the ParenExpr contains a type variable that may be a pack,
+      // add a parenthesize constraint to decide whether or not this should
+      // produce a tuple type once the type variable is resolved.
+      auto *elementVar = elementType->getAs<TypeVariableType>();
+      if (elementVar && elementVar->getImpl().canBindToPack()) {
+        auto *typeVar = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                              TVO_CanBindToHole);
+        CS.addConstraint(ConstraintKind::Parenthesize, typeVar, elementType,
+                         CS.getConstraintLocator(expr));
+        return typeVar;
+      }
+
+      if (elementType->is<PackExpansionType>()) {
+        return TupleType::get({elementType}, CS.getASTContext());
       }
 
       if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {

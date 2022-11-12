@@ -226,6 +226,10 @@ enum class ConstraintKind : char {
   BindTupleOfFunctionParams,
   /// The first type is a type pack, and the second type is its reduced shape.
   ShapeOf,
+  /// The first type is a parenthesized type of the second type. If
+  /// the second type is a pack expansion, parentheses produce a tuple,
+  /// otherwise, parentheses produce the second type directly.
+  Parenthesize,
 };
 
 /// Classification of the different kinds of constraints.
@@ -692,6 +696,7 @@ public:
     case ConstraintKind::DefaultClosureType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PackElementOf:
+    case ConstraintKind::Parenthesize:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:

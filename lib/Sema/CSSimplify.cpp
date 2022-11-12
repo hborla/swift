@@ -2305,6 +2305,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::Parenthesize:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
   }
 
@@ -2665,6 +2666,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::Parenthesize:
     return true;
   }
 
@@ -3083,6 +3085,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
   case ConstraintKind::ShapeOf:
+  case ConstraintKind::Parenthesize:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -6458,6 +6461,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::BindTupleOfFunctionParams:
     case ConstraintKind::PackElementOf:
     case ConstraintKind::ShapeOf:
+    case ConstraintKind::Parenthesize:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -12641,6 +12645,39 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
   return SolutionKind::Solved;
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyParenthesizeConstraint(Type type1, Type type2,
+                                                 TypeMatchOptions flags,
+                                                 ConstraintLocatorBuilder locator) {
+  // type1 is the result of parenthesizing type2. First, simplify type2.
+  type2 = simplifyType(type2, flags);
+
+  // If type2 is a type variable that can bind to a pack, we can't know
+  // whether or not type1 is a tuple type.
+  auto *typeVar = type2->getAs<TypeVariableType>();
+  if (typeVar && typeVar->getImpl().canBindToPack()) {
+    // If we're supposed to generate constraints, do so.
+    if (!flags.contains(TMF_GenerateConstraints))
+      return SolutionKind::Unsolved;
+
+    auto loc = getConstraintLocator(locator);
+    addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::Parenthesize,
+                           type1, type2, loc));
+    return SolutionKind::Solved;
+  }
+
+  if (type2->is<PackExpansionType>()) {
+    addConstraint(ConstraintKind::Bind, type1,
+                  TupleType::get({type2}, getASTContext()), locator);
+  } else {
+    addConstraint(ConstraintKind::Bind, type1, type2, locator);
+  }
+
+  return SolutionKind::Solved;
+}
+
+
 static llvm::PointerIntPair<Type, 3, unsigned>
 getBaseTypeForPointer(TypeBase *type) {
   unsigned unwrapCount = 0;
@@ -13990,6 +14027,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::ShapeOf:
     return simplifyShapeOfConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::Parenthesize:
+    return simplifyParenthesizeConstraint(first, second, subflags, locator);
+
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::ValueWitness:
@@ -14579,6 +14619,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::ShapeOf:
     return simplifyShapeOfConstraint(
         constraint.getFirstType(), constraint.getSecondType(), /*flags*/ None,
+        constraint.getLocator());
+
+  case ConstraintKind::Parenthesize:
+    return simplifyParenthesizeConstraint(
+        constraint.getFirstType(), constraint.getSecondType(), /*flags*/None,
         constraint.getLocator());
   }
 
