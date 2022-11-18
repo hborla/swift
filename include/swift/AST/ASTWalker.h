@@ -513,6 +513,10 @@ public:
   /// value of a property wrapper placeholder.
   virtual bool shouldWalkIntoPropertyWrapperPlaceholderValue() { return true; }
 
+  /// Configures whether the walker should visit the subexpression of an
+  /// unresolved ellipsis expr.
+  virtual bool shouldWalkIntoUnresolvedEllipsisExpr() { return false; }
+
   /// This method configures whether the walker should visit the capture
   /// initializer expressions within a capture list directly, rather than
   /// walking the declarations.

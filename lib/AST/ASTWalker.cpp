@@ -839,6 +839,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitUnresolvedEllipsisExpr(UnresolvedEllipsisExpr *E) {
+    if (!Walker.shouldWalkIntoUnresolvedEllipsisExpr())
+      return E;
+
     if (Expr *subExpr = doIt(E->getSubExpr())) {
       E->setSubExpr(subExpr);
       return E;
