@@ -219,6 +219,11 @@ protected:
     CS.recordDisjunctionChoice(disjunctionLocator, index);
   }
 
+  void recordEllipsisOperatorChoice(ConstraintLocator *locator,
+                                    Expr *expr) {
+    CS.recordEllipsisOperatorChoice(locator, expr);
+  }
+
   Score getCurrentScore() const { return CS.CurrentScore; }
 
   Optional<Score> getBestScore() const { return CS.solverState->BestScore; }

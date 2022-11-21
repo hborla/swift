@@ -3583,7 +3583,10 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       llvm::interleave(
           openedAtLoc.begin(), openedAtLoc.end(),
           [&](OpenedType opened) {
-            opened.second->getImpl().getGenericParameter()->print(log, PO);
+            auto *gp = opened.second->getImpl().getGenericParameter();
+            gp->print(log, PO);
+            if (gp->isParameterPack())
+              log << "...";
             log << " := ";
             Type(opened.second).print(log, PO);
           },

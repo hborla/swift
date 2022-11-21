@@ -112,6 +112,10 @@ Solution ConstraintSystem::finalize() {
   solution.overloadChoices.insert(ResolvedOverloads.begin(),
                                   ResolvedOverloads.end());
 
+  // Copy the resolved ellipsis operator expressions.
+  solution.resolvedEllipsisOperators.insert(ResolvedEllipsisOperators.begin(),
+                                            ResolvedEllipsisOperators.end());
+
   // For each of the constraint restrictions, record it with simplified,
   // canonical types.
   if (solverState) {
@@ -237,6 +241,9 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   // FIXME: Copy these directly into some kind of partial solution?
   for (auto overload : solution.overloadChoices)
     ResolvedOverloads.insert(overload);
+
+  for (auto ellipsis : solution.resolvedEllipsisOperators)
+    ResolvedEllipsisOperators.insert(ellipsis);
 
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
@@ -582,6 +589,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numResultBuilderTransformed = cs.resultBuilderTransformed.size();
   numAppliedPropertyWrappers = cs.appliedPropertyWrappers.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
+  numResolvedEllipsisOperators = cs.ResolvedEllipsisOperators.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
   numContextualTypes = cs.contextualTypes.size();
   numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
@@ -607,6 +615,8 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.TypeVariables, numTypeVariables);
 
   truncate(cs.ResolvedOverloads, numResolvedOverloads);
+
+  truncate(cs.ResolvedEllipsisOperators, numResolvedEllipsisOperators);
 
   // Restore bindings.
   cs.restoreTypeVariableBindings(cs.solverState->savedBindings.size() -
@@ -1740,6 +1750,19 @@ ConstraintSystem::filterDisjunction(
   }
 }
 
+static Constraint *selectPackExpansionDisjunction(
+    ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions) {
+  auto result = llvm::find_if(disjunctions, [](Constraint *disjunction) {
+    auto anchor = disjunction->getLocator()->getAnchor();
+    return getAsExpr<UnresolvedEllipsisExpr>(anchor);
+  });
+
+  if (result != disjunctions.end())
+    return *result;
+
+  return nullptr;
+}
+
 // Attempt to find a disjunction of bind constraints where all options
 // in the disjunction are binding the same type variable.
 //
@@ -2254,6 +2277,9 @@ Constraint *ConstraintSystem::selectDisjunction() {
   collectDisjunctions(disjunctions);
   if (disjunctions.empty())
     return nullptr;
+
+  if (auto *disjunction = selectPackExpansionDisjunction(*this, disjunctions))
+    return disjunction;
 
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;

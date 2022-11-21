@@ -80,10 +80,6 @@ bool TuplePackMatcher::match() {
     if (auto *lhsExpansionType = lhsElt.getType()->getAs<PackExpansionType>()) {
       lhsElts = lhsElts.slice(1);
 
-      assert(lhsElts.empty() || lhsElts.front().hasName() &&
-             "Tuple element with pack expansion type cannot be followed "
-             "by an unlabeled element");
-
       auto rhs = gatherTupleElements(rhsElts, lhsElt.getName(), ctx);
       pairs.emplace_back(lhsExpansionType, rhs, idx++);
       continue;
@@ -99,10 +95,6 @@ bool TuplePackMatcher::match() {
     auto rhsElt = rhsElts.front();
     if (auto *rhsExpansionType = rhsElt.getType()->getAs<PackExpansionType>()) {
       rhsElts = rhsElts.slice(1);
-
-      assert(rhsElts.empty() || rhsElts.front().hasName() &&
-             "Tuple element with pack expansion type cannot be followed "
-             "by an unlabeled element");
 
       auto lhs = gatherTupleElements(lhsElts, rhsElt.getName(), ctx);
       pairs.emplace_back(lhs, rhsExpansionType, idx++);

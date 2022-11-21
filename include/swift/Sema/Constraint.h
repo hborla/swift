@@ -218,6 +218,8 @@ enum class ConstraintKind : char {
   /// The first type is the opened pack element type of the second type, which
   /// is the pattern of a pack expansion type.
   PackElementOf,
+  /// The first type is a pack of the second type.
+  PackOf,
   /// Do not add new uses of this, it only exists to retain compatibility for
   /// rdar://85263844.
   ///
@@ -696,6 +698,7 @@ public:
     case ConstraintKind::DefaultClosureType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PackElementOf:
+    case ConstraintKind::PackOf:
     case ConstraintKind::Parenthesize:
       return ConstraintClassification::Relational;
 

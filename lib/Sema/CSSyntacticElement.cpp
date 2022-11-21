@@ -1222,7 +1222,11 @@ ConstraintSystem::simplifySyntacticElementConstraint(
   } else if (auto *fn = getAsDecl<AbstractFunctionDecl>(anchor)) {
     context = SyntacticElementContext::forFunction(fn);
   } else {
-    return SolutionKind::Error;
+    if (auto *closure = dyn_cast<ClosureExpr>(DC)) {
+      context = SyntacticElementContext::forClosure(closure);
+    } else {
+      context = SyntacticElementContext::forFunction(dyn_cast<AbstractFunctionDecl>(DC->getAsDecl()));
+    }
   }
 
   SyntacticElementConstraintGenerator generator(*this, *context,

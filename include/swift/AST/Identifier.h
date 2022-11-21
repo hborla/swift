@@ -129,7 +129,7 @@ public:
   }
 
   bool isExpansionOperator() const {
-    return is("...");
+    return is("*");
   }
 
   /// isOperatorStartCodePoint - Return true if the specified code point is a

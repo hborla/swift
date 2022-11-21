@@ -693,6 +693,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   // Map historical flags over to experimental features. We do this for all
   // compilers because that's how existing experimental feature flags work.
+  Opts.Features.insert(Feature::VariadicGenerics);
+  
   if (Args.hasArg(OPT_enable_experimental_static_assert))
     Opts.Features.insert(Feature::StaticAssert);
   if (Args.hasArg(OPT_enable_experimental_named_opaque_types))

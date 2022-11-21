@@ -22,6 +22,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -787,7 +788,7 @@ namespace {
       if (CS.isArgumentIgnoredForCodeCompletion(expr)) {
         return Action::SkipChildren(expr);
       }
-      
+
       if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
         if (isa<PrefixUnaryExpr>(applyExpr) ||
             isa<PostfixUnaryExpr>(applyExpr)) {
@@ -2923,8 +2924,88 @@ namespace {
       return variadicSeq;
     }
 
+    struct PackReferenceFinder : public ASTWalker {
+      DeclContext *dc;
+      llvm::SmallVector<OpaqueValueExpr *, 2> opaqueValues;
+      llvm::SmallVector<Expr *, 2> bindings;
+      GenericEnvironment *environment;
+
+      PackReferenceFinder(DeclContext *dc, GenericEnvironment *environment)
+        : dc(dc), environment(environment) {}
+
+      virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+        auto &ctx = dc->getASTContext();
+
+        if (auto *declRef = dyn_cast<DeclRefExpr>(E)) {
+          auto *decl = dyn_cast<VarDecl>(declRef->getDecl());
+          if (!decl)
+            return Action::Continue(E);
+
+          if (auto expansionType = decl->getType()->getAs<PackExpansionType>()) {
+            auto sourceRange = declRef->getSourceRange();
+
+            // Map the pattern interface type into the context of the opened
+            // element signature.
+            auto elementType = environment->mapPackTypeIntoElementContext(
+                expansionType->getPatternType()->mapTypeOutOfContext());
+
+            auto *opaqueValue = new (ctx) OpaqueValueExpr(sourceRange, elementType);
+            opaqueValues.push_back(opaqueValue);
+            bindings.push_back(declRef);
+            return Action::Continue(opaqueValue);
+          }
+        }
+
+        return Action::Continue(E);
+      }
+    };
+
     Type visitUnresolvedEllipsisExpr(UnresolvedEllipsisExpr *expr) {
-      llvm_unreachable("not implemented for UnresolvedEllipsisExpr");
+      auto &ctx = CS.getASTContext();
+      auto *postfixExpr = dyn_cast<PostfixUnaryExpr>(expr->getSubExpr());
+      auto *locator = CS.getConstraintLocator(expr);
+      auto typeVar = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                           TVO_CanBindToPack |
+                                           TVO_CanBindToHole);
+
+      // Create a syntactic element constraint to generate constraints for
+      // a postfix unary operator expression.
+      auto *operatorConstraint =
+          Constraint::createSyntacticElement(CS, postfixExpr,
+                                             {typeVar, CTP_CallArgument},
+                                             locator);
+
+      // Create a syntactic element constraint to generate constraints for
+      // a pack expansion expression.
+      auto sig = ctx.getOpenedElementSignature(
+          CurDC->getGenericSignatureOfContext().getCanonicalSignature());
+      auto *environment = GenericEnvironment::forOpenedElement(sig, UUID::fromTime());
+      PackReferenceFinder packReferenceFinder(CurDC, environment);
+      auto *pattern = postfixExpr->getOperand()->walk(packReferenceFinder);
+      auto *expansionExpr =
+          PackExpansionExpr::create(ctx, pattern,
+                                    packReferenceFinder.opaqueValues,
+                                    packReferenceFinder.bindings,
+                                    expr->getEndLoc(), environment);
+      auto *expansionConstraint =
+          Constraint::createSyntacticElement(CS, expansionExpr,
+                                             {typeVar, CTP_CallArgument},
+                                             locator);
+
+
+      // SyntacticElement constraints expect to be solved inside conjunctions in
+      // order to bring referenced type variables into the constraint system scope, but
+      // the conjunction isn't otherwise necessary here.
+      SmallVector<TypeVariableType *, 2> referencedVars;
+      referencedVars.push_back(typeVar);
+      CS.addDisjunctionConstraint({
+        Constraint::createConjunction(CS, {operatorConstraint}, /*isolated*/false,
+                                      locator, referencedVars),
+        Constraint::createConjunction(CS, {expansionConstraint}, /*isolated*/false,
+                                      locator, referencedVars)
+      }, locator, RememberChoice);
+
+      return typeVar;
     }
 
     Type visitPackExpansionExpr(PackExpansionExpr *expr) {

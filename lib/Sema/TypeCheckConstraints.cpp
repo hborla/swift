@@ -1323,6 +1323,20 @@ void Solution::dump(raw_ostream &out) const {
     out << "\n";
   }
 
+  if (!resolvedEllipsisOperators.empty()) {
+    out << "\nEllipsis choices:";
+    for (auto ellipsis : resolvedEllipsisOperators) {
+      out << "\n";
+      out.indent(2);
+      ellipsis.first->dump(sm, out);
+      out << " as ";
+      if (isa<PackExpansionExpr>(ellipsis.second))
+        out << "pack expansion";
+      else
+        out << "postfix operator";
+    }
+    out << "\n";
+  }
 
   if (!ConstraintRestrictions.empty()) {
     out << "\nConstraint restrictions:\n";

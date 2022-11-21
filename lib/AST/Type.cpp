@@ -5596,8 +5596,18 @@ case TypeKind::Id:
     if (!transformedPat)
       return Type();
 
-    Type transformedCount =
-        expand->getCountType().transformWithPosition(pos, fn);
+    // FIXME
+    Type transformedCount;
+    if (!transformedPat->hasTypeVariable() &&
+        !transformedPat->hasTypeParameter() &&
+        transformedPat->hasArchetype() &&
+        transformedPat->getReducedShape()) {
+      transformedCount = transformedPat->getReducedShape();
+    } else {
+      transformedCount =
+          expand->getCountType().transformWithPosition(pos, fn);
+    }
+
     if (!transformedCount)
       return Type();
 

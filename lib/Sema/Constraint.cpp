@@ -80,6 +80,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
+  case ConstraintKind::PackOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::Parenthesize:
     assert(!First.isNull());
@@ -169,6 +170,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
+  case ConstraintKind::PackOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::Parenthesize:
     llvm_unreachable("Wrong constructor");
@@ -317,6 +319,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
+  case ConstraintKind::PackOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::Parenthesize:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
@@ -559,8 +562,12 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm, unsigned inden
     Out << " element of pack expansion pattern ";
     break;
 
+  case ConstraintKind::PackOf:
+    Out << " pack of ";
+    break;
+
   case ConstraintKind::ShapeOf:
-    Out << " shape of ";
+    Out << " has shape ";
     break;
 
   case ConstraintKind::Parenthesize:
@@ -732,6 +739,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
+  case ConstraintKind::PackOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::Parenthesize:
     constraint->getFirstType()->getTypeVariables(typeVars);
@@ -998,6 +1006,9 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
     // if this disjunction is formed from "fixed"
     // constraints let's not try to validate.
     if (choice->HasRestriction || choice->getFix())
+      return true;
+
+    if (choice->getKind() == ConstraintKind::Conjunction)
       return true;
 
     auto currentType = choice->getFirstType();

@@ -8523,6 +8523,11 @@ namespace {
         return Action::SkipChildren(closure);
       }
 
+      // FIXME:  here?
+      if (auto *ellipsis = dyn_cast<UnresolvedEllipsisExpr>(expr)) {
+        expr = Rewriter.solution.getResolvedEllipsis(Rewriter.cs.getConstraintLocator(expr));
+      }
+
       if (auto tap = dyn_cast_or_null<TapExpr>(expr)) {
         // We remember the DeclContext because the code to handle
         // single-expression-body closures above changes it.

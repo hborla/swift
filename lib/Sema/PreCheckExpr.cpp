@@ -415,60 +415,6 @@ static bool exprLooksLikeAType(Expr *expr) {
       getCompositionExpr(expr);
 }
 
-static Expr *getPackExpansion(DeclContext *dc, Expr *expr, SourceLoc opLoc) {
-  struct PackReferenceFinder : public ASTWalker {
-    DeclContext *dc;
-    llvm::SmallVector<OpaqueValueExpr *, 2> opaqueValues;
-    llvm::SmallVector<Expr *, 2> bindings;
-    GenericEnvironment *environment;
-
-    PackReferenceFinder(DeclContext *dc)
-      : dc(dc), environment(nullptr) {}
-
-    virtual PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      auto &ctx = dc->getASTContext();
-
-      if (auto *declRef = dyn_cast<DeclRefExpr>(E)) {
-        auto *decl = dyn_cast<VarDecl>(declRef->getDecl());
-        if (!decl)
-          return Action::Continue(E);
-
-        if (auto expansionType = decl->getType()->getAs<PackExpansionType>()) {
-          auto sourceRange = declRef->getSourceRange();
-
-          // Map the pattern interface type into the context of the opened
-          // element signature.
-          if (!environment) {
-            auto sig = ctx.getOpenedElementSignature(
-                dc->getGenericSignatureOfContext().getCanonicalSignature());
-            environment = GenericEnvironment::forOpenedElement(sig, UUID::fromTime());
-          }
-          auto elementType = environment->mapPackTypeIntoElementContext(
-              expansionType->getPatternType()->mapTypeOutOfContext());
-
-          auto *opaqueValue = new (ctx) OpaqueValueExpr(sourceRange, elementType);
-          opaqueValues.push_back(opaqueValue);
-          bindings.push_back(declRef);
-          return Action::Continue(opaqueValue);
-        }
-      }
-
-      return Action::Continue(E);
-    }
-  } packReferenceFinder(dc);
-
-  auto *pattern = expr->walk(packReferenceFinder);
-
-  if (!packReferenceFinder.bindings.empty()) {
-    return PackExpansionExpr::create(dc->getASTContext(), pattern,
-                                     packReferenceFinder.opaqueValues,
-                                     packReferenceFinder.bindings,
-                                     opLoc, packReferenceFinder.environment);
-  }
-
-  return nullptr;
-}
-
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
@@ -744,6 +690,11 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     // Diagnose uses of operators that found no matching candidates.
     if (ResultValues.empty()) {
       assert(UDRE->getRefKind() != DeclRefKind::Ordinary);
+      if (Context.LangOpts.hasFeature(Feature::VariadicGenerics) &&
+          UDRE->getRefKind() == DeclRefKind::PrefixOperator &&
+          Name.getBaseIdentifier().isExpansionOperator()) {
+        return UnresolvedEllipsisExpr::create(Context, nullptr, Loc);
+      }
       Context.Diags.diagnose(
           Loc, diag::use_nonmatching_operator, Name,
           UDRE->getRefKind() == DeclRefKind::BinaryOperator
@@ -1364,13 +1315,23 @@ namespace {
       // Rewrite postfix unary '...' expressions containing pack
       // references to PackExpansionExpr.
       if (auto *postfixExpr = dyn_cast<PostfixUnaryExpr>(expr)) {
-        auto *op = dyn_cast<OverloadedDeclRefExpr>(postfixExpr->getFn());
-        if (op && Ctx.LangOpts.hasFeature(Feature::VariadicGenerics) &&
-            op->getDecls()[0]->getBaseName().getIdentifier().isExpansionOperator()) {
-          auto *operand = postfixExpr->getOperand();
-          if (auto *expansion = getPackExpansion(DC, operand, op->getLoc())) {
-            return Action::Continue(expansion);
+        bool hasParameterPacks = false;
+        if (auto sig = DC->getGenericSignatureOfContext()) {
+          for (auto *param : sig.getGenericParams()) {
+            if (param->isParameterPack()) {
+              hasParameterPacks = true;
+              break;
+            }
           }
+        }
+
+        auto *op = dyn_cast<OverloadedDeclRefExpr>(postfixExpr->getFn());
+        if (hasParameterPacks && op && Ctx.LangOpts.hasFeature(Feature::VariadicGenerics) &&
+            op->getDecls()[0]->getBaseName().getIdentifier().isExpansionOperator()) {
+          auto *ellipsis = UnresolvedEllipsisExpr::create(DC->getASTContext(),
+                                                          postfixExpr,
+                                                          op->getLoc());
+          return Action::Continue(ellipsis);
         }
       }
 

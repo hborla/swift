@@ -824,7 +824,19 @@ bool DisjunctionStep::attempt(const DisjunctionChoice &choice) {
   // took for it.
   if (auto *disjunctionLocator = getLocator()) {
     auto index = choice.getIndex();
-    recordDisjunctionChoice(disjunctionLocator, index);
+    auto anchor = disjunctionLocator->getAnchor();
+    
+    if (getAsExpr<UnresolvedEllipsisExpr>(anchor)) {
+      Constraint *constraint = choice;
+      assert(constraint->getKind() == ConstraintKind::Conjunction);
+      auto *exprConstraint = constraint->getNestedConstraints().front();
+      auto *expr = getAsExpr(exprConstraint->getSyntacticElement());
+      recordEllipsisOperatorChoice(disjunctionLocator, expr);
+      if (!dyn_cast<PackExpansionExpr>(expr))
+        CS.increaseScore(SK_UnappliedFunction); // FIXME
+    } else {
+      recordDisjunctionChoice(disjunctionLocator, index);
+    }
 
     // Implicit unwraps of optionals are worse solutions than those
     // not involving implicit unwraps.

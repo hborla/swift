@@ -1462,6 +1462,11 @@ public:
   /// The set of overload choices along with their types.
   llvm::DenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
 
+  /// The set of resolved ellipsis choices mapped to the corresponding
+  /// expression, which is either a postfix unary expr or a pack expansion
+  /// expr.
+  llvm::DenseMap<ConstraintLocator *, Expr *> resolvedEllipsisOperators;
+
   /// The set of constraint restrictions used to arrive at this restriction,
   /// which informs constraint application.
   llvm::DenseMap<std::pair<CanType, CanType>, ConversionRestrictionKind>
@@ -1621,6 +1626,15 @@ public:
   /// locator.
   SelectedOverload getOverloadChoice(ConstraintLocator *locator) const {
     return *getOverloadChoiceIfAvailable(locator);
+  }
+
+  /// Retrieve the ellipsis expression choice for the given locator.
+  Expr *getResolvedEllipsis(ConstraintLocator *locator) {
+    auto found = resolvedEllipsisOperators.find(locator);
+    if (found != resolvedEllipsisOperators.end())
+      return found->second;
+
+    return nullptr;
   }
 
   /// Retrieve the overload choice associated with the given
@@ -2866,6 +2880,9 @@ private:
   /// The overload sets that have been resolved along the current path.
   llvm::MapVector<ConstraintLocator *, SelectedOverload> ResolvedOverloads;
 
+  /// The ellipsis operators '...' that have been resolved.
+  llvm::MapVector<ConstraintLocator *, Expr *> ResolvedEllipsisOperators;
+
   /// The current fixed score for this constraint system and the (partial)
   /// solution it represents.
   Score CurrentScore;
@@ -3504,6 +3521,9 @@ public:
     /// The length of \c ResolvedOverloads.
     unsigned numResolvedOverloads;
 
+    /// The length of \c ResolvedEllipsisOperators;
+    unsigned numResolvedEllipsisOperators;
+
     /// The length of \c ClosureTypes.
     unsigned numInferredClosureTypes;
 
@@ -3563,6 +3583,16 @@ public:
   /// Determine whether this constraint system has any free type
   /// variables.
   bool hasFreeTypeVariables();
+
+  /// Determine whether the given type may have unresolved pack
+  /// references.
+  bool mayContainPackReferences(Type type) {
+    SmallPtrSet<TypeVariableType *, 2> typeVars;
+    type->getTypeVariables(typeVars);
+    return llvm::any_of(typeVars, [](auto *typeVar) {
+      return typeVar->getImpl().canBindToPack();
+    });
+  }
 
   /// Check whether constraint solver is running in "debug" mode,
   /// which should output diagnostic information.
@@ -5513,6 +5543,16 @@ private:
                                   TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
 
+  /// Attempt to simplify a PackOf constraint.
+  ///
+  /// If the second type is a pack archetype, the second type must match
+  /// it exactly. If the second type is a scalar type, the first type must
+  /// be a PackType with the second type as its only element.
+  SolutionKind
+  simplifyPackOfConstraint(Type first, Type second,
+                           TypeMatchOptions flags,
+                           ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(
       Type type1, Type type2,
@@ -5708,6 +5748,13 @@ private:
     assert(!DisjunctionChoices.count(disjunctionLocator) ||
            DisjunctionChoices[disjunctionLocator] == index);
     DisjunctionChoices.insert({disjunctionLocator, index});
+  }
+
+  /// Record the choice for an ellipsis operator in the current
+  /// search path.
+  void recordEllipsisOperatorChoice(ConstraintLocator *locator,
+                                    Expr *ellipsisExpr) {
+    ResolvedEllipsisOperators.insert({locator, ellipsisExpr});
   }
 
   /// Filter the set of disjunction terms, keeping only those where the

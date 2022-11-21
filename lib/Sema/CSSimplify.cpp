@@ -1756,8 +1756,28 @@ static ConstraintSystem::TypeMatchResult matchCallArguments(
         argTypes.push_back(argType);
       }
 
-      auto *argPack = PackType::get(cs.getASTContext(), argTypes);
-      auto *argPackExpansion = PackExpansionType::get(argPack, argPack);
+      Type argPack;
+      Type packShape;
+      if (argTypes.size() == 1) {
+        auto *patternTypeVar =
+            cs.createTypeVariable(loc, TVO_CanBindToHole | TVO_CanBindToPack);
+        cs.addConstraint(ConstraintKind::PackOf, patternTypeVar,
+                         argTypes.front(), loc);
+        argPack = patternTypeVar;
+
+        auto shapeLocator = locator.withPathElement(ConstraintLocator::PackShape);
+        auto *shapeTypeVar =
+            cs.createTypeVariable(cs.getConstraintLocator(shapeLocator),
+                                  TVO_CanBindToHole | TVO_CanBindToPack);
+        cs.addConstraint(ConstraintKind::ShapeOf, patternTypeVar,
+                         shapeTypeVar, loc);
+        packShape = shapeTypeVar;
+      } else {
+        argPack = PackType::get(cs.getASTContext(), argTypes);
+        packShape = argPack;
+      }
+
+      auto *argPackExpansion = PackExpansionType::get(argPack, packShape);
 
       cs.addConstraint(
           subKind, argPackExpansion, paramPackExpansion,
@@ -2221,6 +2241,11 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator) {
+  // FIXME: TuplePackMatcher doesn't correctly handle matching two
+  // abstract contextual tuple types in a generic context.
+  if (tuple1->isEqual(tuple2))
+    return getTypeMatchSuccess();
+
   TupleMatcher matcher(tuple1, tuple2);
 
   ConstraintKind subkind;
@@ -2304,6 +2329,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
+  case ConstraintKind::PackOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::Parenthesize:
     llvm_unreachable("Bad constraint kind in matchTupleTypes()");
@@ -2665,6 +2691,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
+  case ConstraintKind::PackOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::Parenthesize:
     return true;
@@ -3084,6 +3111,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::SyntacticElement:
   case ConstraintKind::BindTupleOfFunctionParams:
   case ConstraintKind::PackElementOf:
+  case ConstraintKind::PackOf:
   case ConstraintKind::ShapeOf:
   case ConstraintKind::Parenthesize:
     llvm_unreachable("Not a relational constraint");
@@ -6460,6 +6488,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::SyntacticElement:
     case ConstraintKind::BindTupleOfFunctionParams:
     case ConstraintKind::PackElementOf:
+    case ConstraintKind::PackOf:
     case ConstraintKind::ShapeOf:
     case ConstraintKind::Parenthesize:
       llvm_unreachable("Not a relational constraint");
@@ -6573,6 +6602,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     case TypeKind::Tuple: {
+      // FIXME: getFixedTypeRecursive doesn't handle structural types.
+      desugar1 = simplifyType(desugar1)->getDesugaredType();
+      desugar2 = simplifyType(desugar2)->getDesugaredType();
+
+      // If the tuple has more than one element, packs must be
+      // resolved before matching.
+      if (desugar1->getAs<TupleType>()->getNumElements() > 1 &&
+          (mayContainPackReferences(desugar1) ||
+           mayContainPackReferences(desugar2))) {
+          return formUnsolvedResult();
+      }
+
       // Add each tuple type to the locator before matching the element types.
       // This is useful for diagnostics, because the error message can use the
       // full tuple type for several element mismatches. Use the original types
@@ -6855,6 +6896,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                             kind, subflags, packLoc);
     }
     case TypeKind::PackExpansion: {
+      // FIXME: getFixedTypeRecursive doesn't handle structural types.
+      desugar1 = simplifyType(desugar1)->getDesugaredType();
+      desugar2 = simplifyType(desugar2)->getDesugaredType();
+
+//      if (mayContainPackReferences(desugar1) ||
+//          mayContainPackReferences(desugar2))
+//        return formUnsolvedResult();
+
       auto expansion1 = cast<PackExpansionType>(desugar1);
       auto expansion2 = cast<PackExpansionType>(desugar2);
 
@@ -8579,6 +8628,63 @@ ConstraintSystem::simplifyPackElementOfConstraint(Type first, Type second,
       elementType->mapTypeOutOfContext());
   addConstraint(ConstraintKind::Bind, second, patternType, locator);
 
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyPackOfConstraint(Type first, Type second,
+                                           TypeMatchOptions flags,
+                                           ConstraintLocatorBuilder locator) {
+  second = simplifyType(second, flags);
+
+  if (mayContainPackReferences(second)) {
+    if (!flags.contains(TMF_GenerateConstraints))
+      return SolutionKind::Unsolved;
+
+    addUnsolvedConstraint(
+        Constraint::create(*this, ConstraintKind::PackOf, first,
+                           second, getConstraintLocator(locator)));
+
+    return SolutionKind::Solved;
+  }
+
+  if (first->isEqual(second))
+    return SolutionKind::Solved;
+
+  auto packElement = second;
+
+  // Look through pack expansion types... is this necessary???
+  if (auto *expansion = packElement->getAs<PackExpansionType>()) {
+    packElement = expansion->getPatternType();
+  }
+
+  struct Walker : public TypeWalker {
+    bool result = false;
+    Walker() {}
+
+    Action walkToTypePre(Type type) override {
+      if (type->is<PackExpansionType>()) {
+        return Action::Stop;
+      }
+
+      if (type->is<PackArchetypeType>()) {
+        result = true;
+        return Action::Stop;
+      }
+
+      return Action::Continue;
+    }
+  } walker;
+
+  packElement.walk(walker);
+
+  if (walker.result) {
+    addConstraint(ConstraintKind::Bind, first, packElement, locator);
+    return SolutionKind::Solved;
+  }
+
+  auto *argPack = PackType::get(getASTContext(), {packElement});
+  addConstraint(ConstraintKind::Bind, first, argPack, locator);
   return SolutionKind::Solved;
 }
 
@@ -12633,14 +12739,25 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyShapeOfConstraint(
 
   // We can't compute a reduced shape if the input type still
   // contains type variables that might bind to pack archetypes.
-  SmallPtrSet<TypeVariableType *, 2> typeVars;
-  type1->getTypeVariables(typeVars);
-  for (auto *typeVar : typeVars) {
-    if (typeVar->getImpl().canBindToPack())
-      return formUnsolved();
-  }
+  if (mayContainPackReferences(type1))
+    return formUnsolved();
 
   auto shape = type1->getReducedShape();
+  type2 = simplifyType(type2);
+  if (!mayContainPackReferences(type2) &&
+      !type2->isEqual(shape) && 
+      locator.isForRequirement(RequirementKind::SameShape)) {
+    if (shouldAttemptFixes()) {
+      // FIXME: Get the types from the SameShape requirement?
+      auto *fix = SkipSameShapeRequirement::create(*this, type1, type2,
+                                                   getConstraintLocator(locator));
+      if (!recordFix(fix))
+        return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Error;
+  }
+  
   addConstraint(ConstraintKind::Bind, shape, type2, locator);
   return SolutionKind::Solved;
 }
@@ -14024,6 +14141,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::PackElementOf:
     return simplifyPackElementOfConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::PackOf:
+    return simplifyPackOfConstraint(first, second, subflags, locator);
+
   case ConstraintKind::ShapeOf:
     return simplifyShapeOfConstraint(first, second, subflags, locator);
 
@@ -14613,6 +14733,11 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::PackElementOf:
     return simplifyPackElementOfConstraint(
+        constraint.getFirstType(), constraint.getSecondType(), /*flags*/None,
+        constraint.getLocator());
+
+  case ConstraintKind::PackOf:
+    return simplifyPackOfConstraint(
         constraint.getFirstType(), constraint.getSecondType(), /*flags*/None,
         constraint.getLocator());
 
