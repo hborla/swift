@@ -676,6 +676,13 @@ AbstractionPattern AbstractionPattern::getPackExpansionPatternType() const {
   llvm_unreachable("bad kind");
 }
 
+AbstractionPattern AbstractionPattern::getPackElementPackType() const {
+  assert(getKind() == Kind::Type);
+  return AbstractionPattern(getGenericSubstitutions(),
+                            getGenericSignature(),
+                            cast<PackElementType>(getType()).getPackType());
+}
+
 size_t AbstractionPattern::getNumPackExpandedComponents() const {
   assert(isPackExpansion());
   assert(getKind() == Kind::Type || getKind() == Kind::Discard);
@@ -2086,6 +2093,11 @@ public:
   CanType visitPackExpansionType(CanPackExpansionType pack,
                                  AbstractionPattern pattern) {
     llvm_unreachable("shouldn't encounter pack expansion by itself");
+  }
+
+  CanType visitPackElementType(CanPackElementType packElement,
+                               AbstractionPattern pattern) {
+    llvm_unreachable("shouldn't encounter pack element by itself");
   }
 
   CanType handlePackExpansion(AbstractionPattern origExpansion,

@@ -6969,6 +6969,41 @@ BEGIN_CAN_TYPE_WRAPPER(PackExpansionType, Type)
   }
 END_CAN_TYPE_WRAPPER(PackExpansionType, Type)
 
+/// The interface type of a pack element inside a pack expansion type,
+/// spelled with the \c each keyword.
+class PackElementType : public TypeBase, public llvm::FoldingSetNode {
+  friend class ASTContext;
+
+  Type packType;
+
+  PackElementType(Type packType,
+                  RecursiveTypeProperties properties,
+                  const ASTContext *ctx);
+
+public:
+  static PackElementType *get(Type packType);
+
+  Type getPackType() const { return packType; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getPackType());
+  }
+
+  static void Profile(llvm::FoldingSetNodeID &ID, Type packType);
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::PackElement;
+  }
+};
+BEGIN_CAN_TYPE_WRAPPER(PackElementType, Type)
+  static CanPackElementType get(CanType pack);
+
+  CanType getPackType() const {
+    return CanType(getPointer()->getPackType());
+  }
+END_CAN_TYPE_WRAPPER(PackElementType, Type)
+
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() const {
   // If this type is canonical, it has the ASTContext in it.

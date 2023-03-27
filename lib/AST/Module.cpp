@@ -1854,6 +1854,11 @@ LookupConformanceInModuleRequest::evaluate(
     return getBuiltinBuiltinTypeConformance(type, builtinType, protocol);
   }
 
+  // FIXME: ???
+  if (auto *packElement = type->getAs<PackElementType>()) {
+    return mod->lookupConformance(packElement->getPackType(), protocol);
+  }
+
   // Specific handling of Copyable for pack expansions.
   if (auto packExpansion = type->getAs<PackExpansionType>()) {
     if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {

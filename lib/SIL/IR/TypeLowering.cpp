@@ -340,6 +340,12 @@ namespace {
       return asImpl().handleAddressOnly(type, props);
     }
 
+    RetTy visitPackElementType(CanPackElementType type,
+                                 AbstractionPattern origType,
+                                 IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("not implemented for PackElementTYpe");
+    }
+
     RetTy visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
                                      AbstractionPattern orig,
                                      IsTypeExpansionSensitive_t isSensitive) {
@@ -2241,6 +2247,25 @@ namespace {
       return handleAddressOnly(packExpansionType, properties);
     }
 
+    TypeLowering *visitPackElementType(CanPackElementType packElementType,
+                                       AbstractionPattern origType,
+                                       IsTypeExpansionSensitive_t isSensitive) {
+      RecursiveProperties properties;
+      auto &packLowering =
+        TC.getTypeLowering(origType.getPackElementPackType(),
+                           packElementType.getPackType(),
+                           Expansion);
+      properties.addSubobject(packLowering.getRecursiveProperties());
+      properties = mergeIsTypeExpansionSensitive(isSensitive, properties);
+
+      if (properties.isAddressOnly()) {
+        return handleAddressOnly(packElementType, properties);
+      } else {
+        // FIXME: !!!
+        return handleReference(packElementType, properties);
+      }
+    }
+
     TypeLowering *visitBuiltinTupleType(CanBuiltinTupleType type,
                                         AbstractionPattern origType,
                                         IsTypeExpansionSensitive_t isSensitive) {
@@ -3023,6 +3048,22 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
 
       return CanType(PackExpansionType::get(loweredSubstPatternType,
                                             loweredSubstCountType));
+    }
+
+    CanType visitPackElementType(CanPackElementType substPackElementType) {
+      bool changed = false;
+
+      CanType substPackType = substPackElementType.getPackType();
+      CanType loweredSubstPackType = TC.getLoweredRValueType(
+          forExpansion,
+          origType.getPackElementPackType(),
+          substPackType);
+      changed |= (loweredSubstPackType != substPackType);
+
+      if (!changed)
+        return substPackElementType;
+
+      return CanType(PackElementType::get(loweredSubstPackType));
     }
 
     CanType visitBuiltinTupleType(CanBuiltinTupleType type) {

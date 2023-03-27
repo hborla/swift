@@ -7168,6 +7168,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return matchPackExpansionTypes(expansion1, expansion2, kind, subflags,
                                      locator);
     }
+
+    case TypeKind::PackElement: {
+      auto pack1 = cast<PackElementType>(desugar1)->getPackType();
+      auto pack2 = cast<PackElementType>(desugar2)->getPackType();
+
+      return matchTypes(pack1, pack2, kind, subflags, locator);
+    }
     }
   }
 
@@ -7822,7 +7829,8 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::InOut:
   case TypeKind::Module:
   case TypeKind::Pack:
-  case TypeKind::PackExpansion: {
+  case TypeKind::PackExpansion:
+  case TypeKind::PackElement: {
     // If solver is in the diagnostic mode and this is an invalid base,
     // let's give solver a chance to repair it to produce a good diagnostic.
     if (shouldAttemptFixes())

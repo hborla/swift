@@ -4614,6 +4614,11 @@ public:
     return CanType(PackExpansionType::get(patternType, countType));
   }
 
+  CanType visitPackElementType(CanPackElementType origType) {
+    CanType packType = visit(origType.getPackType());
+    return CanType(PackElementType::get(packType));
+  }
+
   void substPackExpansion(CanPackExpansionType origType,
                           llvm::function_ref<void(CanType)> addExpandedType) {
     CanType origCountType = origType.getCountType();

@@ -4628,7 +4628,7 @@ NeverNullType TypeResolver::resolvePackElement(PackElementTypeRepr *repr,
     return openPackElement(env->mapTypeIntoContext(packReference), repr);
   }
 
-  return packReference;
+  return PackElementType::get(packReference);
 }
 
 NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,

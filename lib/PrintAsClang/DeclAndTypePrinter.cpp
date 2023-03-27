@@ -2609,6 +2609,10 @@ private:
     os << "void";
   }
 
+  void visitPackElementType(PackElementType *PET, Optional<OptionalTypeKind> optionalKind) {
+    os << "void";
+  }
+
   void visitParenType(ParenType *PT, Optional<OptionalTypeKind> optionalKind) {
     visitPart(PT->getSinglyDesugaredType(), optionalKind);
   }

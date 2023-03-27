@@ -5931,6 +5931,11 @@ public:
     TypePrinter(Printer, innerOptions).visit(T->getPatternType());
   }
 
+  void visitPackElementType(PackElementType *T) {
+    Printer << "each ";
+    TypePrinter(Printer, Options).visit(T->getPackType());
+  }
+
   void visitTupleType(TupleType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::TupleType);
     SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
@@ -6837,16 +6842,16 @@ public:
     }
   }
 
-  void printEach() {
-    if (Options.PrintExplicitEach)
-      Printer << "each ";
-  }
+//  void printEach() {
+//    if (Options.PrintExplicitEach)
+//      Printer << "each ";
+//  }
 
   void printArchetypeCommon(ArchetypeType *T) {
     if (Options.AlternativeTypeNames) {
       auto found = Options.AlternativeTypeNames->find(T->getCanonicalType());
       if (found != Options.AlternativeTypeNames->end()) {
-        if (T->isParameterPack()) printEach();
+//        if (T->isParameterPack()) printEach();
         Printer << found->second.str();
         return;
       }
@@ -6960,7 +6965,7 @@ public:
 
   void visitGenericTypeParamType(GenericTypeParamType *T) {
     auto printPrefix = [&]{
-      if (T->isParameterPack()) printEach();
+//      if (T->isParameterPack()) printEach();
     };
 
     auto decl = T->getDecl();

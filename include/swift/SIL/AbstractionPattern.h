@@ -1467,6 +1467,10 @@ public:
   /// components and expansion counts are significant.
   AbstractionPattern getPackExpansionPatternType() const;
 
+  /// Given that the value being abstracted is a pack element type, return
+  /// the originating pack type.
+  AbstractionPattern getPackElementPackType() const;
+
   /// Given that the value being abstracted is a pack expansion type,
   /// return the appropriate pattern type for the given expansion
   /// component.

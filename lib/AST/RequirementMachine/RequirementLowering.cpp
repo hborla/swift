@@ -250,6 +250,9 @@ static void desugarSuperclassRequirement(Type subjectType,
                                          SourceLoc loc,
                                          SmallVectorImpl<Requirement> &result,
                                          SmallVectorImpl<RequirementError> &errors) {
+  if (auto packElement = subjectType->getAs<PackElementType>())
+    subjectType = packElement->getPackType();
+
   if (!subjectType->isTypeParameter()) {
     Requirement requirement(RequirementKind::Superclass,
                             subjectType, constraintType);
@@ -272,6 +275,9 @@ static void desugarLayoutRequirement(Type subjectType,
                                      SourceLoc loc,
                                      SmallVectorImpl<Requirement> &result,
                                      SmallVectorImpl<RequirementError> &errors) {
+  if (auto packElement = subjectType->getAs<PackElementType>())
+    subjectType = packElement->getPackType();
+
   if (!subjectType->isTypeParameter()) {
     Requirement requirement(RequirementKind::Layout,
                             subjectType, layout);
@@ -296,6 +302,9 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
                                           SourceLoc loc,
                                           SmallVectorImpl<Requirement> &result,
                                           SmallVectorImpl<RequirementError> &errors) {
+  if (auto packElement = subjectType->getAs<PackElementType>())
+    subjectType = packElement->getPackType();
+
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
     if (!subjectType->isTypeParameter()) {
@@ -365,6 +374,12 @@ static void desugarConformanceRequirement(Type subjectType, Type constraintType,
 static void desugarSameShapeRequirement(Type lhs, Type rhs, SourceLoc loc,
                                         SmallVectorImpl<Requirement> &result,
                                         SmallVectorImpl<RequirementError> &errors) {
+  if (auto element = lhs->getAs<PackElementType>())
+    lhs = element->getPackType();
+
+  if (auto element = rhs->getAs<PackElementType>())
+    rhs = element->getPackType();
+
   // For now, only allow shape requirements directly between pack types.
   if (!lhs->isParameterPack() || !rhs->isParameterPack()) {
     errors.push_back(RequirementError::forInvalidShapeRequirement(

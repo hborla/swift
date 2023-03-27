@@ -584,6 +584,13 @@ public:
                    getCategory());
   }
 
+  /// Given this is a pack element type, return the lowered type of the
+  /// originating pack type.
+  SILType getPackElementPackType() const {
+    return SILType(castTo<PackElementType>().getPackType(),
+                   getCategory());
+  }
+
   /// Return the immediate superclass type of this type, or null if
   /// it's the most-derived type.
   SILType getSuperclass() const {

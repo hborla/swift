@@ -6805,6 +6805,18 @@ Expected<Type> DESERIALIZE_TYPE(PACK_EXPANSION_TYPE)(
   return PackExpansionType::get(patternTy.get(), countTy.get());
 }
 
+Expected<Type> DESERIALIZE_TYPE(PACK_ELEMENT_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  TypeID packID;
+  decls_block::PackElementTypeLayout::readRecord(scratch, packID);
+
+  auto packType = MF.getTypeChecked(packID);
+  if (!packType)
+    return packType.takeError();
+
+  return PackElementType::get(packType.get());
+}
+
 Expected<Type> DESERIALIZE_TYPE(PACK_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
   // The pack record itself is empty. Read all trailing elements.
