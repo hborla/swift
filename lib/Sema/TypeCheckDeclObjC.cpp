@@ -714,6 +714,13 @@ bool swift::isRepresentableInObjC(
           .limitBehavior(behavior);
       Reason.describe(accessor);
       return false;
+
+    case AccessorKind::Init:
+      diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
+                            diag::objc_init_accessor)
+          .limitBehavior(behavior);
+      Reason.describe(accessor);
+      return false;
     }
     llvm_unreachable("bad kind");
   }
@@ -1399,6 +1406,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
       case AccessorKind::Modify:
       case AccessorKind::Read:
       case AccessorKind::WillSet:
+      case AccessorKind::Init:
         return false;
 
       case AccessorKind::MutableAddress:

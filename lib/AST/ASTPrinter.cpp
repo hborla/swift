@@ -4305,6 +4305,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
     break;
   case AccessorKind::Set:
   case AccessorKind::WillSet:
+  case AccessorKind::Init:
     recordDeclLoc(decl,
       [&]{
         Printer << getAccessorLabel(decl->getAccessorKind());
@@ -4319,6 +4320,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
           }
         }
       });
+    break;
   }
 
   // handle effects specifiers before the body

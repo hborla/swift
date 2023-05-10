@@ -1583,6 +1583,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
         case AccessorKind::MutableAddress:
         case AccessorKind::DidSet:
         case AccessorKind::WillSet:
+        case AccessorKind::Init:
           return true;
         }
         llvm_unreachable("bad kind");

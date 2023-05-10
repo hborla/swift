@@ -4381,6 +4381,7 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
     case AccessorKind::Set:
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
+    case AccessorKind::Init:
       // Ignore references to the 'newValue' or 'oldValue' parameters.
       if (AccessorParams.front() == PD) {
         return true;
