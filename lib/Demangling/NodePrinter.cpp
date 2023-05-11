@@ -413,6 +413,7 @@ private:
     case Node::Kind::GlobalGetter:
     case Node::Kind::Identifier:
     case Node::Kind::Index:
+    case Node::Kind::InitAccessor:
     case Node::Kind::IVarInitializer:
     case Node::Kind::IVarDestroyer:
     case Node::Kind::ImplDifferentiabilityKind:
@@ -2586,6 +2587,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::ModifyAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "modify");
+  case Node::Kind::InitAccessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "init");
   case Node::Kind::Allocator:
     return printEntity(
         Node, depth, asPrefixContext, TypePrinting::FunctionStyle,
