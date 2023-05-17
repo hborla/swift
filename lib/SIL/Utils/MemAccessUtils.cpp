@@ -2613,6 +2613,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
 
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::AssignByWrapperInst:
+  case SILInstructionKind::AssignOrInitInst:
     visitor(&I->getAllOperands()[AssignInst::Dest]);
     return;
 

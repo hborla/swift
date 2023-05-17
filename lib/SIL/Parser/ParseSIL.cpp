@@ -4520,6 +4520,21 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::AssignOrInitInst: {
+    SILValue Src, InitFn, SetFn;
+
+    if (parseTypedValueRef(Src, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("init") || parseTypedValueRef(InitFn, B) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseVerbatim("set") || parseTypedValueRef(SetFn, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal = B.createAssignOrInit(InstLoc, Src, InitFn, SetFn);
+    break;
+  }
+
   case SILInstructionKind::BeginAccessInst:
   case SILInstructionKind::BeginUnpairedAccessInst:
   case SILInstructionKind::EndAccessInst:
