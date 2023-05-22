@@ -564,7 +564,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     case DIUseKind::Escape:
       continue;
     case DIUseKind::Assign:
-    case DIUseKind::AssignWrappedValue:
+    case DIUseKind::Set:
     case DIUseKind::IndirectIn:
     case DIUseKind::InitOrAssign:
     case DIUseKind::InOutArgument:
@@ -1092,7 +1092,7 @@ void LifetimeChecker::doIt() {
       continue;
         
     case DIUseKind::Assign:
-    case DIUseKind::AssignWrappedValue:
+    case DIUseKind::Set:
       // Instructions classified as assign are only generated when lowering
       // InitOrAssign instructions in regions known to be initialized.  Since
       // they are already known to be definitely init, don't reprocess them.
@@ -1433,7 +1433,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     // value.
     auto allFieldsInitialized =
         getAnyUninitializedMemberAtInst(Use.Inst, 0, TheMemory.getNumElements()) == -1;
-    Use.Kind = allFieldsInitialized ? DIUseKind::AssignWrappedValue : DIUseKind::Assign;
+    Use.Kind = allFieldsInitialized ? DIUseKind::Set : DIUseKind::Assign;
   } else if (isFullyInitialized) {
     Use.Kind = DIUseKind::Assign;
   } else {
@@ -2287,7 +2287,7 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
       Use.Kind == DIUseKind::SelfInit)
     InitKind = IsInitialization;
   else {
-    assert(Use.Kind == DIUseKind::Assign || Use.Kind == DIUseKind::AssignWrappedValue);
+    assert(Use.Kind == DIUseKind::Assign || Use.Kind == DIUseKind::Set);
     InitKind = IsNotInitialization;
   }
 
@@ -2360,7 +2360,7 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
     case DIUseKind::Assign:
       AI->setMode(AssignByWrapperInst::Assign);
       break;
-    case DIUseKind::AssignWrappedValue:
+    case DIUseKind::Set:
       AI->setMode(AssignByWrapperInst::AssignWrappedValue);
       break;
     default:
