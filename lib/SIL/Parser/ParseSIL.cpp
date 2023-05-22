@@ -2298,6 +2298,27 @@ static bool parseAssignByWrapperMode(AssignByWrapperInst::Mode &Result,
   return false;
 }
 
+static bool parseAssignOrInitMode(AssignOrInitInst::Mode &Result,
+                                  SILParser &P) {
+  StringRef Str;
+  if (!parseSILOptional(Str, P)) {
+    Result = AssignOrInitInst::Unknown;
+    return false;
+  }
+
+  auto Tmp = llvm::StringSwitch<AssignOrInitInst::Mode>(Str)
+      .Case("init", AssignOrInitInst::Init)
+      .Case("set", AssignOrInitInst::Set)
+      .Default(AssignOrInitInst::Unknown);
+
+  // Return true (following the conventions in this file) if we fail.
+  if (Tmp == AssignOrInitInst::Unknown)
+    return true;
+
+  Result = Tmp;
+  return false;
+}
+
 // Parse a list of integer indices, prefaced with the given string label.
 // Returns true on error.
 static bool parseIndexList(Parser &P, StringRef label,
@@ -4522,8 +4543,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
   case SILInstructionKind::AssignOrInitInst: {
     SILValue Src, InitFn, SetFn;
+    AssignOrInitInst::Mode Mode;
 
     if (parseTypedValueRef(Src, B) ||
+        parseAssignOrInitMode(Mode, *this) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseVerbatim("init") || parseTypedValueRef(InitFn, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
@@ -4531,7 +4554,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = B.createAssignOrInit(InstLoc, Src, InitFn, SetFn);
+    ResultVal = B.createAssignOrInit(InstLoc, Src, InitFn, SetFn, Mode);
     break;
   }
 
