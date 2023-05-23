@@ -3294,6 +3294,14 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
     }
 
+  case DAK_Initializes: {
+    llvm_unreachable("InitializesAttr not yet implemented");
+  }
+
+  case DAK_Accesses: {
+    llvm_unreachable("AccessesAttr not yet implemented");
+  }
+
   case DAK_Implements: {
     ParserResult<ImplementsAttr> Attr = parseImplementsAttribute(AtLoc, Loc);
     if (Attr.isNonNull()) {
