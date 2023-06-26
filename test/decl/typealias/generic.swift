@@ -463,3 +463,15 @@ func testSugar(_ gx: GX<Int>, _ gy: GX<Int>.GY<Double>, gz: GX<Int>.GY<Double>.E
   let i2: Int = gy  // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>' (aka 'Array<Double>') to specified type 'Int'}}
   let i3: Int = gz // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>.Element' (aka 'Double') to specified type 'Int'}}
 }
+
+struct Test<T> {}
+
+struct Test_Many<T> {}
+
+extension Test {
+  typealias Many = Test_Many<T>
+}
+
+func test<U>(v: U) {
+  _ = Test.Many<U>() // expected-warning{{cannot specialize non-generic type 'Test<_>.Many' (aka 'Test_Many<_>')}}
+}

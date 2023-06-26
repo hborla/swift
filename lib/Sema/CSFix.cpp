@@ -770,6 +770,23 @@ GenericArgumentsMismatch *GenericArgumentsMismatch::create(
       GenericArgumentsMismatch(cs, actual, required, mismatches, locator);
 }
 
+bool OuterGenericArgumentApplication::diagnose(const Solution &solution,
+                                               bool asNote) const {
+  auto &ctx = getConstraintSystem().getASTContext();
+  ctx.Diags.diagnose(getAnchor().getStartLoc(),
+                     diag::not_a_generic_type,
+                     typeAliasType)
+    .limitBehavior(DiagnosticBehavior::Warning);
+
+  return true;
+}
+
+OuterGenericArgumentApplication *
+OuterGenericArgumentApplication::create(ConstraintSystem &cs, Type typeAliasType, ConstraintLocator *loc) {
+  return new (cs.getAllocator())
+      OuterGenericArgumentApplication(cs, typeAliasType, loc);
+}
+
 bool AutoClosureForwarding::diagnose(const Solution &solution,
                                      bool asNote) const {
   AutoClosureForwardingFailure failure(solution, getLocator());

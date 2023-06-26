@@ -13535,11 +13535,30 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   if (simplifiedBoundType->isTypeVariableOrMember())
     return formUnsolved();
 
+  // FIXME: Terrible hack! The compiler used to allow flattening generic
+  // parameters from lower depths when using typealiases in expressions.
+  // Temporarily allow it.
+  bool ignoreParamDepth = false;
+
   ValueDecl *decl;
   SmallVector<OpenedType, 2> openedTypes;
   if (auto *bound = dyn_cast<TypeAliasType>(type1.getPointer())) {
     decl = bound->getDecl();
-    for (auto argType : bound->getDirectGenericArgs()) {
+    ArrayRef<Type> genericArgs;
+
+    if (bound->getDirectGenericArgs().empty()) {
+      auto *fix = OuterGenericArgumentApplication::create(
+          *this, bound, getConstraintLocator(locator));
+      if (recordFix(fix))
+        return SolutionKind::Error;
+
+      ignoreParamDepth = true;
+      genericArgs = bound->getSubstitutionMap().getReplacementTypes();
+    } else {
+      genericArgs = bound->getDirectGenericArgs();
+    }
+
+    for (auto argType : genericArgs) {
       auto *typeVar = argType->getAs<TypeVariableType>();
       auto *genericParam = typeVar->getImpl().getGenericParameter();
       openedTypes.push_back({genericParam, typeVar});
@@ -13565,17 +13584,21 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
   if (!genericContext)
     return SolutionKind::Error;
 
+  unsigned genericParamDepth = 0;
   auto genericParams = genericContext->getGenericParams();
-  if (!genericParams || genericParams->size() == 0) {
-    // FIXME: Record an error here that we're ignoring the parameters.
-    return SolutionKind::Solved;
+  if (!ignoreParamDepth) {
+    if (!genericParams || genericParams->size() == 0) {
+      // FIXME: Record an error here that we're ignoring the parameters.
+      return SolutionKind::Solved;
+    }
+
+    genericParamDepth = genericParams->getParams()[0]->getDepth();
   }
 
   // Map the generic parameters we have over to their opened types.
   SmallVector<Type, 2> openedGenericParams;
-  auto genericParamDepth = genericParams->getParams()[0]->getDepth();
   for (const auto &openedType : openedTypes) {
-    if (openedType.first->getDepth() == genericParamDepth) {
+    if (ignoreParamDepth || openedType.first->getDepth() == genericParamDepth) {
       // A generic argument list containing pack references expects
       // those packs to be wrapped in pack expansion types. If this
       // opened type represents the generic argument for a parameter
@@ -13598,7 +13621,7 @@ ConstraintSystem::simplifyExplicitGenericArgumentsConstraint(
       }
     }
   }
-  assert(openedGenericParams.size() == genericParams->size());
+//  assert(openedGenericParams.size() == genericParams->size());
 
   // Match the opened generic parameters to the specialized arguments.
   auto specializedArgs = type2->castTo<PackType>()->getElementTypes();
@@ -14705,7 +14728,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::MacroMissingPound:
   case FixKind::AllowGlobalActorMismatch:
   case FixKind::AllowAssociatedValueMismatch:
-  case FixKind::GenericArgumentsMismatch: {
+  case FixKind::GenericArgumentsMismatch:
+  case FixKind::OuterGenericArgumentApplication: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   case FixKind::IgnoreInvalidASTNode: {

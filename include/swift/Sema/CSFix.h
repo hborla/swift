@@ -108,6 +108,10 @@ enum class FixKind : uint8_t {
   /// Fix up the generic arguments of two types so they match each other.
   GenericArgumentsMismatch,
 
+  /// Allow applying outer generic arguments directly to a nested
+  /// typealias. This is a warning, and it's temporary.
+  OuterGenericArgumentApplication,
+
   /// Fix up @autoclosure argument to the @autoclosure parameter,
   /// to for a call to be able to forward it properly, since
   /// @autoclosure conversions are unsupported starting from
@@ -1155,6 +1159,29 @@ private:
   MutableArrayRef<unsigned> getMismatchesBuf() {
     return {getTrailingObjects<unsigned>(), NumMismatches};
   }
+};
+
+class OuterGenericArgumentApplication final
+    : public ConstraintFix {
+  Type typeAliasType;
+
+  OuterGenericArgumentApplication(ConstraintSystem &cs,
+                                  Type typeAliasType,
+                                  ConstraintLocator *loc)
+      : ConstraintFix(cs, FixKind::OuterGenericArgumentApplication,
+                      loc, FixBehavior::DowngradeToWarning),
+        typeAliasType(typeAliasType) {}
+
+public:
+  std::string getName() const override {
+    return "allow outer generic argument application";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static OuterGenericArgumentApplication * create(ConstraintSystem &cs,
+                                                  Type typeAliasType,
+                                                  ConstraintLocator *loc);
 };
 
 /// Detect situations where key path doesn't have capability required
