@@ -4185,7 +4185,11 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
     bool regionIsolationEnabled =
         ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation);
     
-    // Globally-isolated closures may never be executed concurrently.
+    // If the closure is isolated, the closure cannot be evaluated
+    // concurrently. If region isolation is enabled, non-Sendable
+    // values captured in an isolated closure are transferred to the
+    // actor's region, meaning there is no potential for concurrent
+    // access.
     if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability) &&
         regionIsolationEnabled && useIsolation.isGlobalActor())
       return false;

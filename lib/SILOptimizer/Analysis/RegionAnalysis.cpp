@@ -1758,8 +1758,11 @@ public:
     }
 
     // Now that we have transferred everything into the partial_apply, perform
-    // an assign fresh for the partial_apply. If we use any of the transferred
-    // values later, we will error, so it is safe to just create a new value.
+    // an assign fresh for the partial_apply if it is non-Sendable. If we use
+    // any of the transferred values later, we will error, so it is safe to just
+    // create a new value.
+    if (pai->getFunctionType()->isSendable())
+      return;
     auto paiValue = tryToTrackValue(pai).value();
     SILValue rep = paiValue.getRepresentative().getValue();
     mergeIsolationRegionInfo(rep, actorIsolation);
@@ -1767,21 +1770,30 @@ public:
   }
 
   void translateSILPartialApply(PartialApplyInst *pai) {
-    // First check if our partial apply is Sendable. In such a case, we will
-    // have emitted an earlier warning in Sema.
+    // First check if our partial apply is Sendable and non-isolated. In such a
+    // case, we will have emitted an earlier warning in Sema.
     //
-    // DISCUSSION: The reason why we can treat values passed into an async let
-    // as transferring safely but it is unsafe to do this for arbitrary Sendable
-    // closures is that we do not know how many times the Sendable closure will
-    // be executed. It is possible to have different invocations of the Sendable
+    // DISCUSSION: The reason why we can treat values passed into:
+    //
+    // 1. An async let.
+    // 2. Sendable GlobalActor isolated closure
+    //
+    // as transferring safely but we cannot for arbitrary Sendable closures is
+    // that we do not know how many times the Sendable closure will be
+    // executed. It is possible to have different invocations of the Sendable
     // closure to cause races with the captured non-Sendable value. In contrast
     // since we know an async let runs exactly once, we do not need to worry
-    // about such a possibility. If we had the ability in the language to
-    // specify that a closure is run at most once or that it is always run
-    // serially, we could lift this restriction... so for now we leave in the
-    // Sema warning and just bail here.
-    if (pai->getFunctionType()->isSendableType())
-      return;
+    // about such a possibility. And if we have a global actor isolated closure,
+    // the global actor will ensure it runs serially. If we had the ability in
+    // the language to specify that a closure is run at most once or that it is
+    // always run serially, we could lift this restriction... so for now we
+    // leave in the Sema warning and just bail here.
+    if (pai->getFunctionType()->isSendableType()) {
+      auto isolationInfo = SILIsolationInfo::get(pai);
+      if (!isolationInfo || !isolationInfo.hasActorIsolation() ||
+          !isolationInfo.getActorIsolation().isGlobalActor())
+        return;
+    }
 
     // Then check if our partial_apply is fed into an async let begin. If so,
     // handle it especially.
