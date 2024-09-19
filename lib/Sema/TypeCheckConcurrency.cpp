@@ -813,6 +813,7 @@ bool SendableCheckContext::isExplicitSendableConformance() const {
 
   switch (*conformanceCheck) {
   case SendableCheck::Explicit:
+  case SendableCheck::ForGlobalVariable:
     return true;
 
   case SendableCheck::ImpliedByStandardProtocol:
@@ -860,8 +861,9 @@ SendableCheckContext::implicitSendableDiagnosticBehavior() const {
 /// nominal type.
 DiagnosticBehavior SendableCheckContext::diagnosticBehavior(
     NominalTypeDecl *nominal) const {
-  if (hasExplicitSendableConformance(nominal))
-    return DiagnosticBehavior::Warning;
+  if (hasExplicitSendableConformance(nominal)) {
+    return defaultDiagnosticBehavior();
+  }
 
   DiagnosticBehavior defaultBehavior = implicitSendableDiagnosticBehavior();
 
@@ -4169,7 +4171,8 @@ namespace {
       }
 
       // Concurrent access to some other local.
-      ctx.Diags.diagnose(loc, diag::concurrent_access_local, value);
+      ctx.Diags.diagnose(loc, diag::concurrent_access_local, value)
+        .limitBehaviorUntilSwiftVersion(limit, 6);
       value->diagnose(
           diag::kind_declared_here, value->getDescriptiveKind());
       return true;
@@ -6153,8 +6156,11 @@ void swift::checkGlobalIsolation(VarDecl *var) {
       bool diagnosed = false;
       if (var->isLet()) {
         auto type = var->getInterfaceType();
+        // FIXME: Wrong downgrade behavior here.
         diagnosed = diagnoseIfAnyNonSendableTypes(
-            type, SendableCheckContext(var->getDeclContext()),
+            type,
+            SendableCheckContext(var->getDeclContext(),
+                                 SendableCheck::ForGlobalVariable),
             /*inDerivedConformance=*/Type(), /*typeLoc=*/SourceLoc(),
             /*diagnoseLoc=*/var->getLoc(), diag::shared_immutable_state_decl,
             diagVar);
@@ -6197,7 +6203,8 @@ bool swift::contextRequiresStrictConcurrencyChecking(
     const DeclContext *dc,
     llvm::function_ref<Type(const AbstractClosureExpr *)> getType,
     llvm::function_ref<bool(const ClosureExpr *)> isolatedByPreconcurrency) {
-  switch (dc->getASTContext().LangOpts.StrictConcurrencyLevel) {
+  auto concurrencyLevel = dc->getASTContext().LangOpts.StrictConcurrencyLevel;
+  switch (concurrencyLevel) {
   case StrictConcurrency::Complete:
     return true;
 
@@ -6224,13 +6231,17 @@ bool swift::contextRequiresStrictConcurrencyChecking(
 
         if (auto type = getType(closure)) {
           if (auto fnType = type->getAs<AnyFunctionType>())
-            if (fnType->isAsync() || fnType->isSendable())
+            if (fnType->isAsync() ||
+                (concurrencyLevel == StrictConcurrency::Targeted &&
+                 fnType->isSendable()))
               return true;
         }
       }
 
       // Async and @Sendable closures use concurrency features.
-      if (closure->isBodyAsync() || closure->isSendable())
+      if (closure->isBodyAsync() ||
+          (concurrencyLevel == StrictConcurrency::Targeted &&
+           closure->isSendable()))
         return true;
     } else if (auto decl = dc->getAsDecl()) {
       // If any isolation attributes are present, we're using concurrency

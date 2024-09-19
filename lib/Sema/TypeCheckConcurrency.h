@@ -360,6 +360,10 @@ enum class SendableCheck {
   /// Implicit conformance to Sendable that would be externally-visible, i.e.,
   /// for a public @_frozen type.
   ImplicitForExternallyVisible,
+  
+  /// The upcoming feature for global variable concurrency checking
+  /// is enabled.
+  ForGlobalVariable,
 };
 
 /// Whether this sendable check is implicit.
@@ -367,6 +371,7 @@ static inline bool isImplicitSendableCheck(SendableCheck check) {
   switch (check) {
   case SendableCheck::Explicit:
   case SendableCheck::ImpliedByStandardProtocol:
+  case SendableCheck::ForGlobalVariable:
     return false;
 
   case SendableCheck::Implicit:
@@ -401,6 +406,7 @@ struct SendableCheckContext {
       bool ignoreExplicitConformance = false) const;
 
   /// Whether we are in an explicit conformance to Sendable.
+  /// FIXME: Rename this
   bool isExplicitSendableConformance() const;
 };
 

@@ -7149,7 +7149,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       if (!attr->isUnsafe() && !type->hasError()) {
         bool diagnosed = diagnoseIfAnyNonSendableTypes(
             type,
-            SendableCheckContext(dc),
+            SendableCheckContext(dc, SendableCheck::ForGlobalVariable),
             Type(),
             SourceLoc(),
             attr->getLocation(),
