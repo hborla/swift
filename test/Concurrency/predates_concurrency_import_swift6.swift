@@ -27,3 +27,7 @@ extension NonStrictClass {
 extension StrictStruct {
   @Sendable func f() { } // expected-warning{{instance method of non-Sendable type 'StrictStruct' cannot be marked as '@Sendable'}}
 }
+
+nonisolated func test(c: C) async {
+  let _ = await c.returnNonSendable
+}

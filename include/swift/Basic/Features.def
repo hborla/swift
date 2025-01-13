@@ -419,7 +419,7 @@ SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
 EXPERIMENTAL_FEATURE(ValueGenerics, true)
 
 // When a parameter has unspecified isolation, infer it as main actor isolated.
-EXPERIMENTAL_FEATURE(UnspecifiedMeansMainActorIsolated, false)
+EXPERIMENTAL_FEATURE(UnspecifiedMeansMainActorIsolated, true)
 
 /// modify/read single-yield coroutines
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
@@ -441,7 +441,7 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
 
 /// Functions with nonisolated isolation inherit their isolation from the
 /// calling context.
-EXPERIMENTAL_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext, false)
+EXPERIMENTAL_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

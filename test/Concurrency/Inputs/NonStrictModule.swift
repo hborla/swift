@@ -15,3 +15,10 @@ open class NonStrictClass2 { }
 open class NonStrictClass3 { }
 
 public protocol MySendableProto: Sendable {}
+
+public final class C: Sendable {
+  @MainActor
+  public var returnNonSendable: NonStrictClass {
+    .init()
+  }
+}
