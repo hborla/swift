@@ -5107,7 +5107,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
 
   // Filter out duplicate actors.
   SmallPtrSet<CanType, 2> globalActorTypes;
-  bool sawActorIndependent = false;
+  bool sawNonisolated = false;
   isolatedRequirements.erase(
       std::remove_if(isolatedRequirements.begin(), isolatedRequirements.end(),
                      [&](IsolatedRequirement &isolated) {
@@ -5120,10 +5120,10 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
         // We only need one nonisolated.
-        if (sawActorIndependent)
+        if (sawNonisolated)
           return true;
 
-        sawActorIndependent = true;
+        sawNonisolated = true;
         return false;
 
       case ActorIsolation::Erased:
@@ -5704,9 +5704,14 @@ static void checkDeclWithIsolatedParameter(ValueDecl *value) {
   }
 }
 
-static void addAttributesForActorIsolation(ValueDecl *value,
-                                           ActorIsolation isolation) {
+static void addAttributesForActorIsolation(
+    ValueDecl *value,
+    InferredActorIsolation inferredIsolation) {
+  if (!inferredIsolation.source.isInferred())
+    return;
+
   ASTContext &ctx = value->getASTContext();
+  auto isolation = inferredIsolation.isolation;
   switch (isolation) {
   case ActorIsolation::CallerIsolationInheriting:
     value->getAttrs().add(new (ctx) ExecutionAttr(ExecutionKind::Caller,
@@ -5948,75 +5953,6 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   std::tie(defaultIsolation, overriddenValue, overridenIsolation) =
       computeDefaultInferredActorIsolation(value);
 
-  // Function used when returning an inferred isolation.
-  auto inferredIsolation = [&](ActorIsolation inferred,
-                               bool onlyGlobal = false) {
-    // check if the inferred isolation is valid in the context of its overridden
-    // isolation.
-    if (overriddenValue) {
-      // if the inferred isolation is not valid, then carry-over the overridden
-      // declaration's isolation as this decl's inferred isolation.
-      switch (validOverrideIsolation(value, inferred, overriddenValue,
-                                     *overridenIsolation)) {
-      case OverrideIsolationResult::Allowed:
-      case OverrideIsolationResult::Sendable:
-        break;
-
-      case OverrideIsolationResult::Disallowed:
-        if (overriddenValue->hasClangNode() &&
-            overridenIsolation->isUnspecified()) {
-          inferred = overridenIsolation->withPreconcurrency(true);
-        } else {
-          inferred = *overridenIsolation;
-        }
-        break;
-      }
-    }
-
-    // Add an implicit attribute to capture the actor isolation that was
-    // inferred, so that (e.g.) it will be printed and serialized.
-    switch (inferred) {
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
-      // Stored properties cannot be non-isolated, so don't infer it.
-      if (auto var = dyn_cast<VarDecl>(value)) {
-        if (!var->isStatic() && var->hasStorage())
-          return ActorIsolation::forUnspecified().withPreconcurrency(
-              inferred.preconcurrency());
-      }
-
-      if (onlyGlobal) {
-        return ActorIsolation::forUnspecified().withPreconcurrency(
-            inferred.preconcurrency());
-      }
-
-      // Add nonisolated attribute
-      addAttributesForActorIsolation(value, inferred);
-      break;
-    case ActorIsolation::CallerIsolationInheriting:
-      addAttributesForActorIsolation(value, inferred);
-      break;
-    case ActorIsolation::Erased:
-      llvm_unreachable("cannot infer erased isolation");
-    case ActorIsolation::GlobalActor: {
-      // Add global actor attribute
-      addAttributesForActorIsolation(value, inferred);
-      break;
-    }
-
-    case ActorIsolation::ActorInstance:
-    case ActorIsolation::Unspecified:
-      if (onlyGlobal)
-        return ActorIsolation::forUnspecified().withPreconcurrency(
-            inferred.preconcurrency());
-
-      // Nothing to do.
-      break;
-    }
-
-    return inferred;
-  };
-
   // If this is a local function, inherit the actor isolation from its
   // context if it global or was captured.
   if (auto func = dyn_cast<FuncDecl>(value)) {
@@ -6042,13 +5978,13 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
 
       case ActorIsolation::ActorInstance:
         return {
-          inferredIsolation(enclosingIsolation),
+          enclosingIsolation,
           IsolationSource(inferenceSource, IsolationSource::LexicalContext)
         };
 
       case ActorIsolation::GlobalActor:
         return {
-          inferredIsolation(enclosingIsolation),
+          enclosingIsolation,
           IsolationSource(inferenceSource, IsolationSource::LexicalContext)
         };
       }
@@ -6070,17 +6006,13 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
          var->getDeclContext()->isAsyncContext())) {
       if (Type mainActor = var->getASTContext().getMainActorType())
         return {
-          inferredIsolation(
-            ActorIsolation::forGlobalActor(mainActor))
+          ActorIsolation::forGlobalActor(mainActor)
               .withPreconcurrency(var->preconcurrency()),
           IsolationSource(/*source*/nullptr, IsolationSource::TopLevelCode)
         };
     }
     if (auto isolation = getActorIsolationFromWrappedProperty(var)) {
-      return {
-        inferredIsolation(isolation),
-        IsolationSource(/*source*/nullptr, IsolationSource::None)
-      };
+      return {isolation, IsolationSource()};
     }
   }
 
@@ -6088,10 +6020,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   // actor isolation of the function it replaces.
   if (auto replacedDecl = value->getDynamicallyReplacedDecl()) {
     if (auto isolation = getActorIsolation(replacedDecl)) {
-      return {
-        inferredIsolation(isolation),
-        IsolationSource(replacedDecl, IsolationSource::None)
-      };
+      return {isolation, IsolationSource(replacedDecl)};
     }
   }
 
@@ -6099,11 +6028,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     // If the declaration witnesses a protocol requirement that is isolated,
     // use that.
     if (auto witnessedIsolation = getIsolationFromWitnessedRequirements(value)) {
-      if (auto inferred = inferredIsolation(witnessedIsolation->isolation)) {
-        return {
-          inferred,
-          witnessedIsolation->source
-        };
+      if (auto inferred = witnessedIsolation->isolation) {
+        return {inferred, witnessedIsolation->source};
       }
     }
 
@@ -6123,7 +6049,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
             superclassIsolation = superclassIsolation.subst(subs);
           }
 
-          if (auto inferred = inferredIsolation(superclassIsolation)) {
+          if (auto inferred = superclassIsolation) {
             return {
               inferred,
               IsolationSource(superclassDecl, IsolationSource::Superclass)
@@ -6137,11 +6063,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       // If the declaration is a nominal type and any of the protocols to which
       // it directly conforms is isolated to a global actor, use that.
       if (auto conformanceIsolation = getIsolationFromConformances(nominal)) {
-        if (auto inferred = inferredIsolation(conformanceIsolation->isolation)) {
-          return {
-            inferred,
-            conformanceIsolation->source
-          };
+        if (auto inferred = conformanceIsolation->isolation) {
+          return {inferred, conformanceIsolation->source};
         }
       }
 
@@ -6150,11 +6073,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
         if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
           if (auto protoIsolation = getIsolationFromInheritedProtocols(proto)) {
-            if (auto inferred = inferredIsolation(protoIsolation->isolation)) {
-              return {
-                inferred,
-                protoIsolation->source
-              };
+            if (auto inferred = protoIsolation->isolation) {
+              return {inferred, protoIsolation->source};
             }
           }
         }
@@ -6163,11 +6083,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       // Before Swift 6: If the declaration is a nominal type and any property
       // wrappers on its stored properties require isolation, use that.
       if (auto wrapperIsolation = getIsolationFromWrappers(nominal)) {
-        if (auto inferred = inferredIsolation(*wrapperIsolation)) {
-          return {
-            inferred,
-            IsolationSource()
-          };
+        if (auto inferred = *wrapperIsolation) {
+          return {inferred, IsolationSource()};
         }
       }
     }
@@ -6182,10 +6099,14 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     // If the declaration is in an extension that has one of the isolation
     // attributes, use that.
     if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
-      if (auto isolationFromAttr = getIsolationFromAttributes(ext)) {
+      if (auto isolation = getIsolationFromAttributes(ext)) {
+        if (onlyGlobal && isolation->isActorInstanceIsolated()) {
+          isolation = ActorIsolation::forUnspecified()
+              .withPreconcurrency(isolation->preconcurrency());
+        }
         return {
-          inferredIsolation(*isolationFromAttr, onlyGlobal),
-          IsolationSource(ext, IsolationSource::Explicit)
+          *isolation,
+          IsolationSource(ext, IsolationSource::LexicalContext)
         };
       }
     }
@@ -6206,8 +6127,18 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
           isolation = ActorIsolation::forCallerIsolationInheriting();
         }
 
-        return {inferredIsolation(isolation, onlyGlobal),
-                selfTypeIsolation.source};
+        if (onlyGlobal && isolation.isActorInstanceIsolated()) {
+          return {
+            ActorIsolation::forUnspecified()
+              .withPreconcurrency(isolation.preconcurrency()),
+            IsolationSource()
+          };
+        }
+
+        return {
+          isolation,
+          IsolationSource(selfTypeDecl, IsolationSource::LexicalContext)
+        };
       }
     }
   }
@@ -6217,9 +6148,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     ASTContext &ctx = value->getASTContext();
     if (Type mainActor = ctx.getMainActorType()) {
       return {
-        inferredIsolation(
           ActorIsolation::forGlobalActor(mainActor)
-              .withPreconcurrency(true)),
+              .withPreconcurrency(true),
         IsolationSource(),
       };
     }
@@ -6234,14 +6164,60 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     // serialization. We do this since we need to support compiling where
     // nonisolated is the default and where caller isolation inheriting is the
     // default.
-    addAttributesForActorIsolation(value, defaultIsolation.isolation);
+    addAttributesForActorIsolation(value, defaultIsolation);
   }
   return defaultIsolation;
 }
 
 InferredActorIsolation ActorIsolationRequest::evaluate(Evaluator &evaluator,
                                                        ValueDecl *value) const {
-  const auto inferredIsolation = computeActorIsolation(evaluator, value);
+  auto inferredIsolation = computeActorIsolation(evaluator, value);
+
+  // Check if the inferred isolation is valid in the context of its overridden
+  // isolation.
+  auto *overriddenValue = value->getOverriddenDeclOrSuperDeinit();
+  if (overriddenValue && inferredIsolation.source.isInferred()) {
+    auto overriddenIsolation = getOverriddenIsolationFor(value);
+    // If the inferred isolation is not valid, then carry-over the overridden
+    // declaration's isolation as this decl's inferred isolation.
+    switch (validOverrideIsolation(value,
+                                   inferredIsolation.isolation,
+                                   overriddenValue,
+                                   overriddenIsolation)) {
+    case OverrideIsolationResult::Allowed:
+    case OverrideIsolationResult::Sendable:
+      break;
+
+    case OverrideIsolationResult::Disallowed:
+      if (overriddenValue->hasClangNode() &&
+          overriddenIsolation.isUnspecified()) {
+        inferredIsolation.isolation =
+            overriddenIsolation.withPreconcurrency(true);
+      } else {
+        inferredIsolation.isolation = overriddenIsolation;
+      }
+      break;
+    }
+  }
+
+  // Add an implicit attribute to capture the actor isolation that was
+  // inferred, so that (e.g.) it will be printed and serialized.
+  switch (inferredIsolation.isolation) {
+  case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
+  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::GlobalActor: {
+    addAttributesForActorIsolation(value, inferredIsolation);
+    break;
+  case ActorIsolation::Erased:
+    llvm_unreachable("cannot infer erased isolation");
+  }
+
+  case ActorIsolation::ActorInstance:
+  case ActorIsolation::Unspecified:
+    // Nothing to do.
+    break;
+  }
 
   auto &ctx = value->getASTContext();
   if (ctx.LangOpts.getFeatureState(Feature::AsyncCallerExecution)

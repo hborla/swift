@@ -340,6 +340,10 @@ struct IsolationSource {
     return (kind != None) && (kind != Explicit);
   }
 
+  bool isExplicit() const {
+    return kind == Explicit;
+  }
+
   void printForDiagnostics(llvm::raw_ostream &os,
                            StringRef openingQuotationMark = "'") const;
 };
